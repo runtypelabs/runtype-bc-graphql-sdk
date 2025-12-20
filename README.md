@@ -151,6 +151,10 @@ npm install
 # Build
 npm run build
 
+# Type checking and linting
+npm run typecheck
+npm run lint
+
 # Run unit tests
 npm test
 
@@ -164,6 +168,23 @@ npm run test:e2e:ui
 npm run test:browser
 # Then open http://localhost:3000
 ```
+
+## Releasing
+
+To release a new version to CDN:
+
+```bash
+npm run release        # Bump patch version (1.0.0 -> 1.0.1)
+npm run release:minor  # Bump minor version (1.0.0 -> 1.1.0)
+npm run release:major  # Bump major version (1.0.0 -> 2.0.0)
+```
+
+This automatically:
+1. Runs lint, typecheck, build, and tests
+2. Bumps version in package.json
+3. Creates git commit and tag
+4. Pushes to GitHub
+5. Deploys to CDN (via GitHub Actions)
 
 ## Test Endpoint
 

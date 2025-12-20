@@ -36,16 +36,40 @@ This SDK provides a clean interface for AI agents to interact with BigCommerce s
 
 ## Installation
 
+### Via NPM
+
+```bash
+npm install @runtypelabs/runtype-bc-graphql-sdk
+```
+
+### Via CDN
+
+Load directly from the BigCommerce CDN with SRI for security:
+
+```html
+<script
+  src="https://cdn11.bigcommerce.com/s-dvzxci70mm/content/runtype-bc-graphql-sdk/latest/sdk.min.js"
+  integrity="sha384-..."
+  crossorigin="anonymous">
+</script>
+```
+
+Get the current SRI hash from:
+`https://cdn11.bigcommerce.com/s-dvzxci70mm/content/runtype-bc-graphql-sdk/latest/sha384.txt`
+
+For pinned versions, use:
+`https://cdn11.bigcommerce.com/s-dvzxci70mm/content/runtype-bc-graphql-sdk/1.0.9/sdk.min.js`
+
 ### Via BigCommerce Script Manager
 
-1. Copy the contents of `bigcommerce-agent-sdk.js`
+1. Copy the contents of `bigcommerce-agent-sdk.js` (or use CDN URL above)
 2. In BigCommerce Admin, go to **Storefront → Script Manager**
 3. Click **Create a Script**
 4. Configure:
    - **Location on page**: Footer
    - **Select pages where script will be added**: All Pages
    - **Script type**: Script
-5. Paste the SDK code
+5. Paste the SDK code or script tag
 6. Save
 
 ### Via Direct Injection
