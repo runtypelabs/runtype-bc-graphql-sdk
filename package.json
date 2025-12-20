@@ -8,14 +8,14 @@
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.esm.js",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.js"
     },
     "./tools": {
+      "types": "./dist/tools.d.ts",
       "import": "./dist/tools.esm.js",
-      "require": "./dist/tools.js",
-      "types": "./dist/tools.d.ts"
+      "require": "./dist/tools.js"
     },
     "./browser": "./dist/bigcommerce-agent-sdk.min.js"
   },

@@ -140,40 +140,40 @@ export class BigCommerceAgentSDK {
     const formatted = { ...product } as Product & Record<string, unknown>
 
     if (formatted.images) {
-      formatted.images = this.flattenEdges(formatted.images as Connection<unknown>) as Product['images']
+      formatted.images = this.flattenEdges(formatted.images as unknown as Connection<unknown>) as Product['images']
     }
     if (formatted.categories) {
-      formatted.categories = this.flattenEdges(formatted.categories as Connection<unknown>) as Product['categories']
+      formatted.categories = this.flattenEdges(formatted.categories as unknown as Connection<unknown>) as Product['categories']
     }
     if (formatted.productOptions) {
       formatted.productOptions = this.flattenEdges(
-        formatted.productOptions as Connection<Record<string, unknown>>
+        formatted.productOptions as unknown as Connection<Record<string, unknown>>
       ).map((opt) => ({
         ...opt,
-        values: opt.values ? this.flattenEdges(opt.values as Connection<unknown>) : [],
+        values: opt.values ? this.flattenEdges(opt.values as unknown as Connection<unknown>) : [],
       })) as Product['productOptions']
     }
     if (formatted.variants) {
       formatted.variants = this.flattenEdges(
-        formatted.variants as Connection<Record<string, unknown>>
+        formatted.variants as unknown as Connection<Record<string, unknown>>
       ).map((v) => ({
         ...v,
         options: v.options
-          ? this.flattenEdges(v.options as Connection<Record<string, unknown>>).map((o) => ({
+          ? this.flattenEdges(v.options as unknown as Connection<Record<string, unknown>>).map((o) => ({
               ...o,
-              values: this.flattenEdges(o.values as Connection<unknown>),
+              values: this.flattenEdges(o.values as unknown as Connection<unknown>),
             }))
           : [],
       })) as Product['variants']
     }
     if (formatted.relatedProducts) {
       formatted.relatedProducts = this.flattenEdges(
-        formatted.relatedProducts as Connection<unknown>
+        formatted.relatedProducts as unknown as Connection<unknown>
       ) as Product['relatedProducts']
     }
     if (formatted.customFields) {
       formatted.customFields = this.flattenEdges(
-        formatted.customFields as Connection<unknown>
+        formatted.customFields as unknown as Connection<unknown>
       ) as Product['customFields']
     }
 

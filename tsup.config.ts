@@ -32,6 +32,9 @@ export default defineConfig([
     format: ['iife'],
     globalName: 'BCAgentSDK',
     minify: true,
-    outDir: 'dist'
+    outDir: 'dist',
+    outExtension() {
+      return { js: '.js' }
+    }
   }
 ])
