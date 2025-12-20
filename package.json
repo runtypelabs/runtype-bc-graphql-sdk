@@ -1,0 +1,72 @@
+{
+  "name": "@runtypelabs/runtype-bc-graphql-sdk",
+  "version": "1.0.0",
+  "description": "BigCommerce Storefront Agent SDK - AI agent integration with BigCommerce storefronts via GraphQL Storefront API",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "browser": "dist/bigcommerce-agent-sdk.min.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.esm.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./tools": {
+      "import": "./dist/tools.esm.js",
+      "require": "./dist/tools.js",
+      "types": "./dist/tools.d.ts"
+    },
+    "./browser": "./dist/bigcommerce-agent-sdk.min.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "build:watch": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/runtypelabs/runtype-bc-graphql-sdk.git"
+  },
+  "keywords": [
+    "bigcommerce",
+    "graphql",
+    "storefront",
+    "sdk",
+    "ai",
+    "agent",
+    "ecommerce",
+    "shopping",
+    "cart"
+  ],
+  "author": "Runtype Labs",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/runtypelabs/runtype-bc-graphql-sdk/issues"
+  },
+  "homepage": "https://github.com/runtypelabs/runtype-bc-graphql-sdk#readme",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.55.0",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
