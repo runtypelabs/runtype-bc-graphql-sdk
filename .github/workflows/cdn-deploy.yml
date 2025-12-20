@@ -64,28 +64,39 @@ jobs:
           git tag -a "v${{ steps.version.outputs.version }}" -m "Release v${{ steps.version.outputs.version }}"
           git push origin "v${{ steps.version.outputs.version }}"
 
-      - name: Prepare upload directory
+      - name: Create WebDAV directories
         run: |
-          mkdir -p cdn-upload
-          cp dist/bigcommerce-agent-sdk.min.js cdn-upload/sdk.min.js
+          # Create parent directory (ignore error if exists)
+          curl -X MKCOL \
+            -u "${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}:${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}" \
+            "https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav/content/runtype-bc-graphql-sdk/" \
+            || true
 
-      - name: Deploy to versioned path
-        uses: XPH0816/webdav-deploy-action@v0.3
-        with:
-          url: https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav
-          username: ${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}
-          password: ${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}
-          local: cdn-upload
-          remote: /content/runtype-bc-graphql-sdk/${{ steps.version.outputs.version }}
+          # Create versioned directory
+          curl -X MKCOL \
+            -u "${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}:${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}" \
+            "https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav/content/runtype-bc-graphql-sdk/${{ steps.version.outputs.version }}/" \
+            || true
 
-      - name: Deploy to latest path
-        uses: XPH0816/webdav-deploy-action@v0.3
-        with:
-          url: https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav
-          username: ${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}
-          password: ${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}
-          local: cdn-upload
-          remote: /content/runtype-bc-graphql-sdk/latest
+          # Create latest directory
+          curl -X MKCOL \
+            -u "${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}:${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}" \
+            "https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav/content/runtype-bc-graphql-sdk/latest/" \
+            || true
+
+      - name: Upload to versioned path
+        run: |
+          curl -T dist/bigcommerce-agent-sdk.min.js \
+            -u "${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}:${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}" \
+            "https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav/content/runtype-bc-graphql-sdk/${{ steps.version.outputs.version }}/sdk.min.js" \
+            --fail-with-body
+
+      - name: Upload to latest path
+        run: |
+          curl -T dist/bigcommerce-agent-sdk.min.js \
+            -u "${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}:${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}" \
+            "https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav/content/runtype-bc-graphql-sdk/latest/sdk.min.js" \
+            --fail-with-body
 
       - name: Output CDN URLs
         run: |
