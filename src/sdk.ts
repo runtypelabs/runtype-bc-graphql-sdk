@@ -355,7 +355,7 @@ export class BigCommerceAgentSDK {
   }
 
   async addToCart(items: CartLineItemInput | CartLineItemInput[]): Promise<Cart | null> {
-    let cart = await this.getCart()
+    const cart = await this.getCart()
 
     const itemsArray = Array.isArray(items) ? items : [items]
 
