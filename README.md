@@ -2,6 +2,7 @@
 
 BigCommerce Storefront Agent SDK - AI agent integration with BigCommerce storefronts via GraphQL Storefront API.
 
+[![CI](https://github.com/runtypelabs/runtype-bc-graphql-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/runtypelabs/runtype-bc-graphql-sdk/actions/workflows/ci.yml)
 [![CDN](https://img.shields.io/badge/CDN-latest-blue)](https://cdn11.bigcommerce.com/s-dvzxci70mm/content/runtype-bc-graphql-sdk/latest/sdk.min.js)
 
 ## Installation
@@ -42,6 +43,29 @@ const cart = await sdk.getCartSummary()
 // Proceed to checkout
 const urls = await sdk.getCheckoutUrls()
 ```
+
+### Browser (CDN)
+
+Load directly from the CDN with SRI for security:
+
+```html
+<script
+  src="https://cdn11.bigcommerce.com/s-dvzxci70mm/content/runtype-bc-graphql-sdk/latest/sdk.min.js"
+  integrity="sha384-..."
+  crossorigin="anonymous">
+</script>
+<script>
+  const sdk = new BCAgentSDK.BigCommerceAgentSDK({
+    graphqlEndpoint: '/graphql',
+    token: 'your-storefront-token',
+  })
+
+  const products = await sdk.searchProducts({ searchTerm: 'shoes' })
+  console.log(products)
+</script>
+```
+
+Get the current SRI hash from: `https://cdn11.bigcommerce.com/s-dvzxci70mm/content/runtype-bc-graphql-sdk/latest/sha384.txt`
 
 ### Browser (Script Manager)
 
@@ -117,6 +141,29 @@ await Runtype.flows
 
 - `getCategoryTree(depth?)` - Get category hierarchy
 - `getStoreSettings()` - Get store configuration
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Build
+npm run build
+
+# Run unit tests
+npm test
+
+# Run browser e2e tests (headless)
+npm run test:e2e
+
+# Run browser e2e tests with UI
+npm run test:e2e:ui
+
+# Start interactive browser test server
+npm run test:browser
+# Then open http://localhost:3000
+```
 
 ## Test Endpoint
 
