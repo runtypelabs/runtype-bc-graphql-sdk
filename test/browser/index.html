@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigCommerce Agent SDK - Browser Tests</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h1 { color: #333; }
+    .test-suite {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .test-suite h2 {
+      margin-top: 0;
+      color: #444;
+      border-bottom: 2px solid #eee;
+      padding-bottom: 10px;
+    }
+    .test {
+      padding: 10px;
+      margin: 8px 0;
+      border-radius: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .test.pending { background: #f0f0f0; color: #666; }
+    .test.running { background: #fff3cd; color: #856404; }
+    .test.passed { background: #d4edda; color: #155724; }
+    .test.failed { background: #f8d7da; color: #721c24; }
+    .test-name { font-weight: 500; }
+    .test-status { font-size: 14px; }
+    .test-details {
+      font-size: 12px;
+      margin-top: 5px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .summary {
+      position: sticky;
+      top: 20px;
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .summary-stats {
+      display: flex;
+      gap: 20px;
+      font-size: 18px;
+    }
+    .summary-stats span { font-weight: bold; }
+    .passed-count { color: #155724; }
+    .failed-count { color: #721c24; }
+    .running-count { color: #856404; }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-right: 10px;
+    }
+    button:hover { background: #0056b3; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    .controls { margin-bottom: 20px; }
+    pre {
+      background: #f8f9fa;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-size: 11px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>BigCommerce Agent SDK - Browser Tests</h1>
+
+  <div class="controls">
+    <button id="runTests">Run All Tests</button>
+    <button id="clearCart">Clear Cart</button>
+  </div>
+
+  <div class="summary">
+    <div class="summary-stats">
+      <div>Total: <span id="totalCount">0</span></div>
+      <div>Passed: <span id="passedCount" class="passed-count">0</span></div>
+      <div>Failed: <span id="failedCount" class="failed-count">0</span></div>
+      <div>Running: <span id="runningCount" class="running-count">0</span></div>
+    </div>
+  </div>
+
+  <div id="testResults"></div>
+
+  <script src="../../dist/bigcommerce-agent-sdk.min.js"></script>
+  <script>
+    // Test configuration
+    const CONFIG = {
+      graphqlEndpoint: 'https://store-dvzxci70mm-1.mybigcommerce.com/graphql',
+      token: 'eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJjaWQiOlsxXSwiY29ycyI6WyJodHRwOi8vbG9jYWxob3N0OjMwMDAiXSwiZWF0IjoyMTQ3NDgzNjQ3LCJpYXQiOjE3NjYyMDI1NTEsImlzcyI6IkJDIiwic2lkIjoxMDAzNDM3MDEzLCJzdWIiOiJjYXowaDVzZWxocmc1ZGNoMHplMDc0NWJhbXFiOXJiIiwic3ViX3R5cGUiOjIsInRva2VuX3R5cGUiOjF9.BkAeIZIUlDJc6Ru2qnFz7z_qb0uXbnBUcv4AWNJpgQoxysVWSaV-uCLE9PXGyKwmg_t_GJnZykUo4oTWEfPm8g',
+      debug: true
+    };
+
+    // Test state
+    let sdk;
+    let testState = {
+      searchedProduct: null,
+      productWithOptions: null,
+      cartId: null
+    };
+
+    // Test runner
+    class TestRunner {
+      constructor() {
+        this.tests = [];
+        this.results = { passed: 0, failed: 0, running: 0 };
+      }
+
+      suite(name, tests) {
+        this.tests.push({ name, tests, results: [] });
+      }
+
+      async runAll() {
+        this.results = { passed: 0, failed: 0, running: 0 };
+        this.updateSummary();
+
+        for (const suite of this.tests) {
+          suite.results = [];
+          this.renderSuite(suite);
+
+          for (const test of suite.tests) {
+            this.results.running++;
+            this.updateSummary();
+            this.updateTest(suite.name, test.name, 'running');
+
+            try {
+              const result = await test.fn();
+              suite.results.push({ name: test.name, status: 'passed', result });
+              this.results.passed++;
+              this.updateTest(suite.name, test.name, 'passed', result);
+            } catch (error) {
+              suite.results.push({ name: test.name, status: 'failed', error: error.message });
+              this.results.failed++;
+              this.updateTest(suite.name, test.name, 'failed', error.message);
+            }
+
+            this.results.running--;
+            this.updateSummary();
+          }
+        }
+      }
+
+      renderSuite(suite) {
+        const container = document.getElementById('testResults');
+        let suiteEl = document.getElementById(`suite-${suite.name.replace(/\s+/g, '-')}`);
+
+        if (!suiteEl) {
+          suiteEl = document.createElement('div');
+          suiteEl.id = `suite-${suite.name.replace(/\s+/g, '-')}`;
+          suiteEl.className = 'test-suite';
+          suiteEl.innerHTML = `<h2>${suite.name}</h2><div class="tests"></div>`;
+          container.appendChild(suiteEl);
+        }
+
+        const testsContainer = suiteEl.querySelector('.tests');
+        testsContainer.innerHTML = suite.tests.map(t => `
+          <div class="test pending" id="test-${suite.name.replace(/\s+/g, '-')}-${t.name.replace(/\s+/g, '-')}">
+            <div>
+              <div class="test-name">${t.name}</div>
+              <div class="test-details"></div>
+            </div>
+            <div class="test-status">pending</div>
+          </div>
+        `).join('');
+      }
+
+      updateTest(suiteName, testName, status, details) {
+        const testId = `test-${suiteName.replace(/\s+/g, '-')}-${testName.replace(/\s+/g, '-')}`;
+        const testEl = document.getElementById(testId);
+        if (testEl) {
+          testEl.className = `test ${status}`;
+          testEl.querySelector('.test-status').textContent = status;
+          if (details) {
+            const detailsEl = testEl.querySelector('.test-details');
+            if (typeof details === 'object') {
+              detailsEl.innerHTML = `<pre>${JSON.stringify(details, null, 2)}</pre>`;
+            } else {
+              detailsEl.textContent = details;
+            }
+          }
+        }
+      }
+
+      updateSummary() {
+        document.getElementById('totalCount').textContent =
+          this.results.passed + this.results.failed + this.results.running;
+        document.getElementById('passedCount').textContent = this.results.passed;
+        document.getElementById('failedCount').textContent = this.results.failed;
+        document.getElementById('runningCount').textContent = this.results.running;
+      }
+    }
+
+    // Initialize
+    const runner = new TestRunner();
+
+    // Define test suites
+    runner.suite('SDK Initialization', [
+      {
+        name: 'SDK loads and initializes',
+        fn: async () => {
+          if (typeof BCAgentSDK === 'undefined') {
+            throw new Error('BCAgentSDK not found on window');
+          }
+          sdk = new BCAgentSDK.BigCommerceAgentSDK(CONFIG);
+          return { message: 'SDK initialized successfully' };
+        }
+      }
+    ]);
+
+    runner.suite('Store Information', [
+      {
+        name: 'Get store settings',
+        fn: async () => {
+          const result = await sdk.getStoreSettings();
+          if (!result.settings) {
+            throw new Error('No settings returned');
+          }
+          return {
+            storeName: result.settings.storeName,
+            currencies: result.currencies?.length || 0
+          };
+        }
+      },
+      {
+        name: 'Get category tree',
+        fn: async () => {
+          const categories = await sdk.getCategoryTree();
+          if (!Array.isArray(categories)) {
+            throw new Error('Categories should be an array');
+          }
+          return {
+            categoryCount: categories.length,
+            firstCategory: categories[0]?.name
+          };
+        }
+      }
+    ]);
+
+    runner.suite('Product Search', [
+      {
+        name: 'Search for products with term "towel"',
+        fn: async () => {
+          const result = await sdk.searchProducts({ searchTerm: 'towel', first: 5 });
+          if (!result.products || result.products.length === 0) {
+            throw new Error('No products found for search term "towel"');
+          }
+          testState.searchedProduct = result.products[0];
+          return {
+            totalItems: result.totalItems,
+            returnedCount: result.products.length,
+            firstProduct: result.products[0]?.name
+          };
+        }
+      },
+      {
+        name: 'Search with filters',
+        fn: async () => {
+          const result = await sdk.searchProducts({
+            hideOutOfStock: true,
+            first: 10,
+            sort: 'BEST_SELLING'
+          });
+          return {
+            totalItems: result.totalItems,
+            filtersCount: result.filters?.length || 0
+          };
+        }
+      }
+    ]);
+
+    runner.suite('Product Details', [
+      {
+        name: 'Get product by ID (from search)',
+        fn: async () => {
+          if (!testState.searchedProduct) {
+            throw new Error('No product from search to fetch');
+          }
+          const product = await sdk.getProductById(testState.searchedProduct.entityId);
+          if (!product) {
+            throw new Error('Product not found');
+          }
+          return {
+            id: product.entityId,
+            name: product.name,
+            price: product.prices?.price?.value,
+            hasOptions: product.productOptions?.length > 0,
+            optionCount: product.productOptions?.length || 0
+          };
+        }
+      },
+      {
+        name: 'Search for product with options',
+        fn: async () => {
+          // Search for products and find one with options
+          const result = await sdk.searchProducts({ first: 20 });
+          const productWithOptions = result.products.find(p =>
+            p.productOptions && p.productOptions.length > 0
+          );
+
+          if (productWithOptions) {
+            testState.productWithOptions = productWithOptions;
+            return {
+              id: productWithOptions.entityId,
+              name: productWithOptions.name,
+              options: productWithOptions.productOptions.map(o => o.displayName)
+            };
+          }
+
+          return { message: 'No product with options found in first 20 results' };
+        }
+      },
+      {
+        name: 'Get configured product with options',
+        fn: async () => {
+          if (!testState.productWithOptions) {
+            return { skipped: true, message: 'No product with options available' };
+          }
+
+          const product = testState.productWithOptions;
+          const firstOption = product.productOptions[0];
+          const firstValue = firstOption.values[0];
+
+          if (!firstValue) {
+            return { skipped: true, message: 'No option values available' };
+          }
+
+          const configured = await sdk.getConfiguredProduct(product.entityId, [{
+            optionEntityId: firstOption.entityId,
+            valueEntityId: firstValue.entityId
+          }]);
+
+          return {
+            id: configured.entityId,
+            name: configured.name,
+            selectedOption: `${firstOption.displayName}: ${firstValue.label}`
+          };
+        }
+      }
+    ]);
+
+    runner.suite('Cart Operations', [
+      {
+        name: 'Get initial cart state',
+        fn: async () => {
+          const cart = await sdk.getCart();
+          return {
+            hasCart: !!cart,
+            cartId: cart?.entityId || 'none'
+          };
+        }
+      },
+      {
+        name: 'Add product to cart',
+        fn: async () => {
+          if (!testState.searchedProduct) {
+            throw new Error('No product available to add');
+          }
+
+          const cart = await sdk.addToCart({
+            productEntityId: testState.searchedProduct.entityId,
+            quantity: 1
+          });
+
+          if (!cart) {
+            throw new Error('Failed to add to cart');
+          }
+
+          testState.cartId = cart.entityId;
+
+          return {
+            cartId: cart.entityId,
+            itemCount: cart.lineItems?.totalQuantity,
+            total: cart.amount?.value
+          };
+        }
+      },
+      {
+        name: 'Get cart summary',
+        fn: async () => {
+          const summary = await sdk.getCartSummary();
+          return {
+            isEmpty: summary.isEmpty,
+            itemCount: summary.itemCount,
+            items: summary.items?.map(i => ({ name: i.name, qty: i.quantity })),
+            total: summary.total?.value
+          };
+        }
+      },
+      {
+        name: 'Update cart item quantity',
+        fn: async () => {
+          const cart = await sdk.getCart();
+          if (!cart || !cart.lineItems?.physicalItems?.length) {
+            return { skipped: true, message: 'No items in cart to update' };
+          }
+
+          const firstItem = cart.lineItems.physicalItems[0];
+          const newQuantity = firstItem.quantity + 1;
+
+          const updatedCart = await sdk.updateCartItem(firstItem.entityId, newQuantity);
+
+          return {
+            itemId: firstItem.entityId,
+            oldQuantity: firstItem.quantity,
+            newQuantity: newQuantity,
+            updatedTotal: updatedCart?.amount?.value
+          };
+        }
+      },
+      {
+        name: 'Quick add to cart',
+        fn: async () => {
+          if (!testState.searchedProduct) {
+            throw new Error('No product available');
+          }
+
+          const result = await sdk.quickAddToCart(
+            testState.searchedProduct.entityId,
+            2
+          );
+
+          return {
+            requiresConfiguration: result.requiresConfiguration,
+            addedQuantity: result.addedQuantity,
+            productName: result.product?.name
+          };
+        }
+      }
+    ]);
+
+    runner.suite('Checkout', [
+      {
+        name: 'Get checkout URLs',
+        fn: async () => {
+          const cart = await sdk.getCart();
+          if (!cart) {
+            return { skipped: true, message: 'No cart available' };
+          }
+
+          const urls = await sdk.getCheckoutUrls();
+          return {
+            hasCheckoutUrl: !!urls.redirectedCheckoutUrl,
+            hasEmbeddedUrl: !!urls.embeddedCheckoutUrl,
+            checkoutUrl: urls.redirectedCheckoutUrl?.substring(0, 80) + '...'
+          };
+        }
+      }
+    ]);
+
+    runner.suite('Cleanup', [
+      {
+        name: 'Delete cart',
+        fn: async () => {
+          const cart = await sdk.getCart();
+          if (!cart) {
+            return { message: 'No cart to delete' };
+          }
+
+          const deletedId = await sdk.deleteCart();
+          return {
+            deletedCartId: deletedId
+          };
+        }
+      },
+      {
+        name: 'Verify cart is empty',
+        fn: async () => {
+          const summary = await sdk.getCartSummary();
+          if (!summary.isEmpty) {
+            throw new Error('Cart should be empty after deletion');
+          }
+          return {
+            isEmpty: summary.isEmpty,
+            itemCount: summary.itemCount
+          };
+        }
+      }
+    ]);
+
+    // Event handlers
+    document.getElementById('runTests').addEventListener('click', async () => {
+      document.getElementById('runTests').disabled = true;
+      document.getElementById('testResults').innerHTML = '';
+
+      try {
+        await runner.runAll();
+      } finally {
+        document.getElementById('runTests').disabled = false;
+      }
+    });
+
+    document.getElementById('clearCart').addEventListener('click', async () => {
+      if (!sdk) {
+        sdk = new BCAgentSDK.BigCommerceAgentSDK(CONFIG);
+      }
+      try {
+        await sdk.deleteCart();
+        alert('Cart cleared!');
+      } catch (e) {
+        alert('No cart to clear or error: ' + e.message);
+      }
+    });
+
+    // Auto-run on load (optional)
+    // window.addEventListener('load', () => document.getElementById('runTests').click());
+  </script>
+</body>
+</html>

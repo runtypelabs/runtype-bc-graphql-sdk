@@ -102,7 +102,7 @@ export class BigCommerceAgentSDK {
     try {
       const response = await fetch(this.graphqlEndpoint, {
         method: 'POST',
-        credentials: 'same-origin',
+        credentials: 'include',
         mode: 'cors',
         headers,
         body: JSON.stringify(body),
@@ -341,18 +341,11 @@ export class BigCommerceAgentSDK {
       cart: {
         createCart: {
           cart: Cart | null
-          errors: Array<{ message: string }>
         }
       }
     }>(MUTATIONS.CREATE_CART, { input })
 
-    const result = data?.cart?.createCart
-
-    if (result?.errors?.length > 0) {
-      throw new Error(result.errors.map((e) => e.message).join(', '))
-    }
-
-    const cart = result?.cart
+    const cart = data?.cart?.createCart?.cart
     if (cart?.entityId) {
       this.cartId = cart.entityId
       this.setStoredCartId(cart.entityId)
@@ -386,18 +379,11 @@ export class BigCommerceAgentSDK {
       cart: {
         addCartLineItems: {
           cart: Cart | null
-          errors: Array<{ message: string }>
         }
       }
     }>(MUTATIONS.ADD_CART_LINE_ITEMS, { input })
 
-    const result = data?.cart?.addCartLineItems
-
-    if (result?.errors?.length > 0) {
-      throw new Error(result.errors.map((e) => e.message).join(', '))
-    }
-
-    return result?.cart || null
+    return data?.cart?.addCartLineItems?.cart || null
   }
 
   async updateCartItem(lineItemEntityId: string, quantity: number): Promise<Cart | null> {
@@ -415,18 +401,11 @@ export class BigCommerceAgentSDK {
       cart: {
         updateCartLineItem: {
           cart: Cart | null
-          errors: Array<{ message: string }>
         }
       }
     }>(MUTATIONS.UPDATE_CART_LINE_ITEM, { input })
 
-    const result = data?.cart?.updateCartLineItem
-
-    if (result?.errors?.length > 0) {
-      throw new Error(result.errors.map((e) => e.message).join(', '))
-    }
-
-    return result?.cart || null
+    return data?.cart?.updateCartLineItem?.cart || null
   }
 
   async removeFromCart(lineItemEntityId: string): Promise<Cart | null> {
@@ -443,18 +422,11 @@ export class BigCommerceAgentSDK {
       cart: {
         deleteCartLineItem: {
           cart: Cart | null
-          errors: Array<{ message: string }>
         }
       }
     }>(MUTATIONS.DELETE_CART_LINE_ITEM, { input })
 
-    const result = data?.cart?.deleteCartLineItem
-
-    if (result?.errors?.length > 0) {
-      throw new Error(result.errors.map((e) => e.message).join(', '))
-    }
-
-    return result?.cart || null
+    return data?.cart?.deleteCartLineItem?.cart || null
   }
 
   async deleteCart(): Promise<string | null> {
@@ -468,21 +440,14 @@ export class BigCommerceAgentSDK {
       cart: {
         deleteCart: {
           deletedCartEntityId: string
-          errors: Array<{ message: string }>
         }
       }
     }>(MUTATIONS.DELETE_CART, { input })
 
-    const result = data?.cart?.deleteCart
-
-    if (result?.errors?.length > 0) {
-      throw new Error(result.errors.map((e) => e.message).join(', '))
-    }
-
     this.cartId = null
     this.setStoredCartId(null)
 
-    return result?.deletedCartEntityId || null
+    return data?.cart?.deleteCart?.deletedCartEntityId || null
   }
 
   // ---------------------------------------------------------------------------
@@ -500,18 +465,11 @@ export class BigCommerceAgentSDK {
       cart: {
         createCartRedirectUrls: {
           redirectUrls: CheckoutUrls
-          errors: Array<{ message: string }>
         }
       }
     }>(MUTATIONS.CREATE_CART_REDIRECT_URLS, { input })
 
-    const result = data?.cart?.createCartRedirectUrls
-
-    if (result?.errors?.length > 0) {
-      throw new Error(result.errors.map((e) => e.message).join(', '))
-    }
-
-    return result?.redirectUrls
+    return data?.cart?.createCartRedirectUrls?.redirectUrls
   }
 
   async proceedToCheckout(embedded = false): Promise<void> {

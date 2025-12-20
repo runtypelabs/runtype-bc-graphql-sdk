@@ -42,11 +42,6 @@ export const CREATE_CART = `
             }
           }
         }
-        errors {
-          ... on Error {
-            message
-          }
-        }
       }
     }
   }
@@ -88,11 +83,6 @@ export const ADD_CART_LINE_ITEMS = `
             }
           }
         }
-        errors {
-          ... on Error {
-            message
-          }
-        }
       }
     }
   }
@@ -114,11 +104,6 @@ export const UPDATE_CART_LINE_ITEM = `
               quantity
               salePrice { value currencyCode }
             }
-          }
-        }
-        errors {
-          ... on Error {
-            message
           }
         }
       }
@@ -143,11 +128,6 @@ export const DELETE_CART_LINE_ITEM = `
           }
         }
         deletedLineItemEntityId
-        errors {
-          ... on Error {
-            message
-          }
-        }
       }
     }
   }
@@ -158,11 +138,6 @@ export const DELETE_CART = `
     cart {
       deleteCart(input: $input) {
         deletedCartEntityId
-        errors {
-          ... on Error {
-            message
-          }
-        }
       }
     }
   }
@@ -175,11 +150,6 @@ export const CREATE_CART_REDIRECT_URLS = `
         redirectUrls {
           embeddedCheckoutUrl
           redirectedCheckoutUrl
-        }
-        errors {
-          ... on Error {
-            message
-          }
         }
       }
     }
