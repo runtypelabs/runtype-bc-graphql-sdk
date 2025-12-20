@@ -34,6 +34,12 @@
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "typecheck": "tsc --noEmit",
+    "preversion": "npm run lint && npm run typecheck && npm run build && npm test",
+    "postversion": "git push && git push --tags",
+    "release": "npm version patch",
+    "release:patch": "npm version patch",
+    "release:minor": "npm version minor",
+    "release:major": "npm version major",
     "prepublishOnly": "npm run build"
   },
   "repository": {
