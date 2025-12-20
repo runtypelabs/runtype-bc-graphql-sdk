@@ -1,0 +1,102 @@
+name: CDN Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  version-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Get current version
+        id: current_version
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Check if version already tagged
+        id: check_tag
+        run: |
+          if git rev-parse "v${{ steps.current_version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Bump patch version
+        if: steps.check_tag.outputs.exists == 'true'
+        run: |
+          npm version patch --no-git-tag-version
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          git add package.json package-lock.json 2>/dev/null || git add package.json
+          git commit -m "chore: bump version to ${NEW_VERSION}"
+          git push
+
+      - name: Get final version
+        id: version
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Create version tag
+        run: |
+          git tag -a "v${{ steps.version.outputs.version }}" -m "Release v${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
+
+      - name: Prepare upload directory
+        run: |
+          mkdir -p cdn-upload
+          cp dist/bigcommerce-agent-sdk.min.js cdn-upload/sdk.min.js
+
+      - name: Deploy to versioned path
+        uses: bxb-publishing/webdav-deploy@v1
+        with:
+          url: https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav
+          username: nathan@runtype.com
+          password: ${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}
+          local: cdn-upload
+          remote: /content/runtype-bc-graphql-sdk/${{ steps.version.outputs.version }}
+
+      - name: Deploy to latest path
+        uses: bxb-publishing/webdav-deploy@v1
+        with:
+          url: https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav
+          username: nathan@runtype.com
+          password: ${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}
+          local: cdn-upload
+          remote: /content/runtype-bc-graphql-sdk/latest
+
+      - name: Output CDN URLs
+        run: |
+          echo "## CDN URLs" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Versioned:**" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "https://cdn11.bigcommerce.com/s-dvzxci70mm/content/runtype-bc-graphql-sdk/${{ steps.version.outputs.version }}/sdk.min.js" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Latest:**" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "https://cdn11.bigcommerce.com/s-dvzxci70mm/content/runtype-bc-graphql-sdk/latest/sdk.min.js" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
