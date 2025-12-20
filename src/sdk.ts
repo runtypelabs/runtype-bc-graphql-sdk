@@ -391,10 +391,29 @@ export class BigCommerceAgentSDK {
       throw new Error('No cart exists')
     }
 
+    // Fetch cart to get the productEntityId for this line item
+    const cart = await this.getCart()
+    if (!cart) {
+      throw new Error('Cart not found')
+    }
+
+    const lineItem =
+      cart.lineItems?.physicalItems?.find((item) => item.entityId === lineItemEntityId) ||
+      cart.lineItems?.digitalItems?.find((item) => item.entityId === lineItemEntityId)
+
+    if (!lineItem) {
+      throw new Error(`Line item ${lineItemEntityId} not found in cart`)
+    }
+
     const input = {
       cartEntityId: this.cartId,
       lineItemEntityId,
-      data: { lineItem: { quantity: Number(quantity) } },
+      data: {
+        lineItem: {
+          productEntityId: lineItem.productEntityId,
+          quantity: Number(quantity),
+        },
+      },
     }
 
     const data = await this.executeGraphQL<{
