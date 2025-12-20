@@ -70,7 +70,7 @@ jobs:
           cp dist/bigcommerce-agent-sdk.min.js cdn-upload/sdk.min.js
 
       - name: Deploy to versioned path
-        uses: bxb-publishing/webdav-deploy@v1
+        uses: XPH0816/webdav-deploy-action@v1
         with:
           url: https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav
           username: nathan@runtype.com
@@ -79,7 +79,7 @@ jobs:
           remote: /content/runtype-bc-graphql-sdk/${{ steps.version.outputs.version }}
 
       - name: Deploy to latest path
-        uses: bxb-publishing/webdav-deploy@v1
+        uses: XPH0816/webdav-deploy-action@v1
         with:
           url: https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav
           username: nathan@runtype.com
