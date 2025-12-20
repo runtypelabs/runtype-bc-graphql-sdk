@@ -67,33 +67,33 @@ jobs:
       - name: Create WebDAV directories
         run: |
           # Create parent directory (ignore error if exists)
-          curl -X MKCOL \
+          curl -X MKCOL --digest \
             -u "${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}:${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}" \
             "https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav/content/runtype-bc-graphql-sdk/" \
             || true
 
           # Create versioned directory
-          curl -X MKCOL \
+          curl -X MKCOL --digest \
             -u "${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}:${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}" \
             "https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav/content/runtype-bc-graphql-sdk/${{ steps.version.outputs.version }}/" \
             || true
 
           # Create latest directory
-          curl -X MKCOL \
+          curl -X MKCOL --digest \
             -u "${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}:${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}" \
             "https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav/content/runtype-bc-graphql-sdk/latest/" \
             || true
 
       - name: Upload to versioned path
         run: |
-          curl -T dist/bigcommerce-agent-sdk.min.js \
+          curl -T dist/bigcommerce-agent-sdk.min.js --digest \
             -u "${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}:${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}" \
             "https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav/content/runtype-bc-graphql-sdk/${{ steps.version.outputs.version }}/sdk.min.js" \
             --fail-with-body
 
       - name: Upload to latest path
         run: |
-          curl -T dist/bigcommerce-agent-sdk.min.js \
+          curl -T dist/bigcommerce-agent-sdk.min.js --digest \
             -u "${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}:${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}" \
             "https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav/content/runtype-bc-graphql-sdk/latest/sdk.min.js" \
             --fail-with-body
