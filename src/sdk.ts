@@ -313,18 +313,33 @@ export class BigCommerceAgentSDK {
 
   async getCart(cartEntityId?: string): Promise<Cart | null> {
     const id = cartEntityId || this.cartId
-    const data = await this.executeGraphQL<{
-      site: { cart: Cart | null }
-    }>(QUERIES.GET_CART, { cartEntityId: id })
 
-    const cart = data?.site?.cart
+    try {
+      const data = await this.executeGraphQL<{
+        site: { cart: Cart | null }
+      }>(QUERIES.GET_CART, { cartEntityId: id })
 
-    if (cart?.entityId) {
-      this.cartId = cart.entityId
-      this.setStoredCartId(cart.entityId)
+      const cart = data?.site?.cart
+
+      if (cart?.entityId) {
+        this.cartId = cart.entityId
+        this.setStoredCartId(cart.entityId)
+      } else if (id) {
+        // Cart ID was provided but cart not found - clear stale ID
+        this.cartId = null
+        this.setStoredCartId(null)
+      }
+
+      return cart
+    } catch (error) {
+      // If cart not found error, clear stale cart ID and return null
+      if (error instanceof Error && error.message.includes('Cart does not exist')) {
+        this.cartId = null
+        this.setStoredCartId(null)
+        return null
+      }
+      throw error
     }
-
-    return cart
   }
 
   async createCart(lineItems: CartLineItemInput[] = []): Promise<Cart | null> {
