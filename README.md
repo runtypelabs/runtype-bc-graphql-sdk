@@ -2,6 +2,8 @@
 
 BigCommerce Storefront Agent SDK - AI agent integration with BigCommerce storefronts via GraphQL Storefront API.
 
+[![CDN](https://img.shields.io/badge/CDN-latest-blue)](https://cdn11.bigcommerce.com/s-dvzxci70mm/content/runtype-bc-graphql-sdk/latest/sdk.min.js)
+
 ## Installation
 
 ```bash
