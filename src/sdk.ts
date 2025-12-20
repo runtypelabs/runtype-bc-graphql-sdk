@@ -431,15 +431,25 @@ export class BigCommerceAgentSDK {
       },
     }
 
-    const data = await this.executeGraphQL<{
-      cart: {
-        updateCartLineItem: {
-          cart: Cart | null
+    try {
+      const data = await this.executeGraphQL<{
+        cart: {
+          updateCartLineItem: {
+            cart: Cart | null
+          }
         }
-      }
-    }>(MUTATIONS.UPDATE_CART_LINE_ITEM, { input })
+      }>(MUTATIONS.UPDATE_CART_LINE_ITEM, { input })
 
-    return data?.cart?.updateCartLineItem?.cart || null
+      return data?.cart?.updateCartLineItem?.cart || null
+    } catch (error) {
+      // If cart doesn't exist or session mismatch, clear stale cart ID
+      if (error instanceof Error && error.message.includes('Cart does not exist')) {
+        this.cartId = null
+        this.setStoredCartId(null)
+        throw new Error('Cart expired or session changed. Please add items to cart again.')
+      }
+      throw error
+    }
   }
 
   async removeFromCart(lineItemEntityId: string): Promise<Cart | null> {

@@ -94,6 +94,8 @@
 
   <div class="controls">
     <button id="runTests">Run All Tests</button>
+    <button id="goToCheckout" disabled>Go to Checkout</button>
+    <button id="runCleanup">Run Cleanup</button>
     <button id="clearCart">Clear Cart</button>
   </div>
 
@@ -122,7 +124,8 @@
     let testState = {
       searchedProduct: null,
       productWithOptions: null,
-      cartId: null
+      cartId: null,
+      checkoutUrl: null
     };
 
     // Test runner
@@ -368,6 +371,16 @@
       {
         name: 'Get initial cart state',
         fn: async () => {
+          // Clear any stale cart from previous sessions to ensure clean test
+          try {
+            await sdk.deleteCart();
+          } catch (e) {
+            // No cart to delete, that's fine
+          }
+          // Also clear stored cart ID
+          sdk.cartId = null;
+          localStorage.removeItem('bc_cart_id');
+
           const cart = await sdk.getCart();
           return {
             hasCart: !!cart,
@@ -472,40 +485,13 @@
           }
 
           const urls = await sdk.getCheckoutUrls();
+          // Store URL for the checkout button
+          testState.checkoutUrl = urls.redirectedCheckoutUrl;
           return {
             hasCheckoutUrl: !!urls.redirectedCheckoutUrl,
             hasEmbeddedUrl: !!urls.embeddedCheckoutUrl,
-            checkoutUrl: urls.redirectedCheckoutUrl?.substring(0, 80) + '...'
-          };
-        }
-      }
-    ]);
-
-    runner.suite('Cleanup', [
-      {
-        name: 'Delete cart',
-        fn: async () => {
-          const cart = await sdk.getCart();
-          if (!cart) {
-            return { message: 'No cart to delete' };
-          }
-
-          const deletedId = await sdk.deleteCart();
-          return {
-            deletedCartId: deletedId
-          };
-        }
-      },
-      {
-        name: 'Verify cart is empty',
-        fn: async () => {
-          const summary = await sdk.getCartSummary();
-          if (!summary.isEmpty) {
-            throw new Error('Cart should be empty after deletion');
-          }
-          return {
-            isEmpty: summary.isEmpty,
-            itemCount: summary.itemCount
+            checkoutUrl: urls.redirectedCheckoutUrl?.substring(0, 80) + '...',
+            _showCheckoutButton: true
           };
         }
       }
@@ -515,12 +501,94 @@
     document.getElementById('runTests').addEventListener('click', async () => {
       document.getElementById('runTests').disabled = true;
       document.getElementById('testResults').innerHTML = '';
+      document.getElementById('goToCheckout').disabled = true;
 
       try {
         await runner.runAll();
+        // Enable checkout button if we have a URL
+        if (testState.checkoutUrl) {
+          document.getElementById('goToCheckout').disabled = false;
+        }
       } finally {
         document.getElementById('runTests').disabled = false;
       }
+    });
+
+    document.getElementById('goToCheckout').addEventListener('click', () => {
+      if (testState.checkoutUrl) {
+        window.location.href = testState.checkoutUrl;
+      } else {
+        alert('No checkout URL available. Run tests first to get checkout URL.');
+      }
+    });
+
+    document.getElementById('runCleanup').addEventListener('click', async () => {
+      if (!sdk) {
+        sdk = new BCAgentSDK.BigCommerceAgentSDK(CONFIG);
+      }
+
+      const resultsDiv = document.getElementById('testResults');
+
+      // Add cleanup results section
+      let cleanupDiv = document.getElementById('suite-Cleanup');
+      if (!cleanupDiv) {
+        cleanupDiv = document.createElement('div');
+        cleanupDiv.id = 'suite-Cleanup';
+        cleanupDiv.className = 'test-suite';
+        cleanupDiv.innerHTML = '<h2>Cleanup</h2><div class="tests"></div>';
+        resultsDiv.appendChild(cleanupDiv);
+      }
+
+      const testsContainer = cleanupDiv.querySelector('.tests');
+      testsContainer.innerHTML = '';
+
+      // Delete cart
+      const deleteDiv = document.createElement('div');
+      deleteDiv.className = 'test running';
+      deleteDiv.innerHTML = '<div><div class="test-name">Delete cart</div><div class="test-details"></div></div><div class="test-status">running</div>';
+      testsContainer.appendChild(deleteDiv);
+
+      try {
+        const cart = await sdk.getCart();
+        if (!cart) {
+          deleteDiv.className = 'test passed';
+          deleteDiv.querySelector('.test-status').textContent = 'passed';
+          deleteDiv.querySelector('.test-details').innerHTML = '<pre>{"message": "No cart to delete"}</pre>';
+        } else {
+          const deletedId = await sdk.deleteCart();
+          deleteDiv.className = 'test passed';
+          deleteDiv.querySelector('.test-status').textContent = 'passed';
+          deleteDiv.querySelector('.test-details').innerHTML = `<pre>{"deletedCartId": "${deletedId}"}</pre>`;
+        }
+      } catch (e) {
+        deleteDiv.className = 'test failed';
+        deleteDiv.querySelector('.test-status').textContent = 'failed';
+        deleteDiv.querySelector('.test-details').textContent = e.message;
+      }
+
+      // Verify cart is empty
+      const verifyDiv = document.createElement('div');
+      verifyDiv.className = 'test running';
+      verifyDiv.innerHTML = '<div><div class="test-name">Verify cart is empty</div><div class="test-details"></div></div><div class="test-status">running</div>';
+      testsContainer.appendChild(verifyDiv);
+
+      try {
+        const summary = await sdk.getCartSummary();
+        if (!summary.isEmpty) {
+          throw new Error('Cart should be empty after deletion');
+        }
+        verifyDiv.className = 'test passed';
+        verifyDiv.querySelector('.test-status').textContent = 'passed';
+        verifyDiv.querySelector('.test-details').innerHTML = `<pre>${JSON.stringify({ isEmpty: summary.isEmpty, itemCount: summary.itemCount }, null, 2)}</pre>`;
+      } catch (e) {
+        verifyDiv.className = 'test failed';
+        verifyDiv.querySelector('.test-status').textContent = 'failed';
+        verifyDiv.querySelector('.test-details').textContent = e.message;
+      }
+
+      // Disable checkout button after cleanup
+      document.getElementById('goToCheckout').disabled = true;
+      testState.checkoutUrl = null;
     });
 
     document.getElementById('clearCart').addEventListener('click', async () => {
@@ -529,6 +597,8 @@
       }
       try {
         await sdk.deleteCart();
+        document.getElementById('goToCheckout').disabled = true;
+        testState.checkoutUrl = null;
         alert('Cart cleared!');
       } catch (e) {
         alert('No cart to clear or error: ' + e.message);
