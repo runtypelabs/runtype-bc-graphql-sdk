@@ -59,6 +59,13 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Generate SRI hash
+        id: sri
+        run: |
+          HASH=$(openssl dgst -sha384 -binary dist/bigcommerce-agent-sdk.min.js | openssl base64 -A)
+          echo "sha384-${HASH}" > dist/sha384.txt
+          echo "hash=sha384-${HASH}" >> $GITHUB_OUTPUT
+
       - name: Create version tag
         run: |
           git tag -a "v${{ steps.version.outputs.version }}" -m "Release v${{ steps.version.outputs.version }}"
@@ -91,11 +98,21 @@ jobs:
             "https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav/content/runtype-bc-graphql-sdk/${{ steps.version.outputs.version }}/sdk.min.js" \
             --fail-with-body
 
+          curl -T dist/sha384.txt --digest \
+            -u "${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}:${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}" \
+            "https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav/content/runtype-bc-graphql-sdk/${{ steps.version.outputs.version }}/sha384.txt" \
+            --fail-with-body
+
       - name: Upload to latest path
         run: |
           curl -T dist/bigcommerce-agent-sdk.min.js --digest \
             -u "${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}:${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}" \
             "https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav/content/runtype-bc-graphql-sdk/latest/sdk.min.js" \
+            --fail-with-body
+
+          curl -T dist/sha384.txt --digest \
+            -u "${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}:${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}" \
+            "https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav/content/runtype-bc-graphql-sdk/latest/sha384.txt" \
             --fail-with-body
 
       - name: Output CDN URLs
@@ -110,4 +127,9 @@ jobs:
           echo "**Latest:**" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "https://cdn11.bigcommerce.com/s-dvzxci70mm/content/runtype-bc-graphql-sdk/latest/sdk.min.js" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**SRI Hash:**" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.sri.outputs.hash }}" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
