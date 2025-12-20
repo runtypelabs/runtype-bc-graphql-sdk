@@ -317,8 +317,8 @@
       {
         name: 'Search for product with options',
         fn: async () => {
-          // Search for products and find one with options
-          const result = await sdk.searchProducts({ first: 20 });
+          // Search for products and find one with options (must include searchTerm)
+          const result = await sdk.searchProducts({ searchTerm: 'shirt', first: 30 });
           const productWithOptions = result.products.find(p =>
             p.productOptions && p.productOptions.length > 0
           );
@@ -332,7 +332,7 @@
             };
           }
 
-          return { message: 'No product with options found in first 20 results' };
+          return { message: 'No product with options found in search results' };
         }
       },
       {
@@ -382,8 +382,15 @@
             throw new Error('No product available to add');
           }
 
+          // Get full product details to find variant ID
+          const product = await sdk.getProductById(testState.searchedProduct.entityId);
+
+          // Get the first variant if product has options
+          const variantId = product.variants?.[0]?.entityId;
+
           const cart = await sdk.addToCart({
             productEntityId: testState.searchedProduct.entityId,
+            variantEntityId: variantId,
             quantity: 1
           });
 
@@ -396,7 +403,8 @@
           return {
             cartId: cart.entityId,
             itemCount: cart.lineItems?.totalQuantity,
-            total: cart.amount?.value
+            total: cart.amount?.value,
+            usedVariantId: variantId
           };
         }
       },

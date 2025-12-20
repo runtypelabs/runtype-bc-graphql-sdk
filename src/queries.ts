@@ -685,7 +685,7 @@ export const GET_CART = `
 `
 
 export const GET_CATEGORY_TREE = `
-  query GetCategoryTree($depth: Int = 3) {
+  query GetCategoryTree {
     site {
       categoryTree {
         entityId
@@ -694,17 +694,13 @@ export const GET_CATEGORY_TREE = `
         description
         productCount
         hasChildren
-        image {
-          url(width: 200)
-          altText
-        }
-        children @include(if: true) {
+        children {
           entityId
           name
           path
           productCount
           hasChildren
-          children @include(if: true) {
+          children {
             entityId
             name
             path
@@ -722,14 +718,9 @@ export const GET_STORE_SETTINGS = `
     site {
       settings {
         storeName
-        storeHash
-        status
         url {
           vanityUrl
           cdnUrl
-        }
-        display {
-          productComparison
         }
         logo {
           title
@@ -745,22 +736,6 @@ export const GET_STORE_SETTINGS = `
         socialMediaLinks {
           name
           url
-        }
-      }
-      currencies {
-        edges {
-          node {
-            entityId
-            code
-            name
-            isActive
-            isDefault
-            display {
-              symbol
-              symbolPlacement
-              decimalPlaces
-            }
-          }
         }
       }
     }

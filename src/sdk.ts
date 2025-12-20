@@ -504,13 +504,12 @@ export class BigCommerceAgentSDK {
     const data = await this.executeGraphQL<{
       site: {
         settings: StoreSettings
-        currencies: Connection<Currency>
       }
     }>(QUERIES.GET_STORE_SETTINGS)
 
     return {
       settings: data?.site?.settings || null,
-      currencies: this.flattenEdges(data?.site?.currencies),
+      currencies: [],
     }
   }
 
