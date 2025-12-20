@@ -3,9 +3,12 @@ name: CDN Deploy
 on:
   push:
     branches: [main]
+    paths:
+      - 'package.json'
+  workflow_dispatch:
 
 jobs:
-  version-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -14,122 +17,114 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: 'npm'
-
-      - name: Configure git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Get current version
-        id: current_version
-        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
-
-      - name: Check if version already tagged
-        id: check_tag
-        run: |
-          if git rev-parse "v${{ steps.current_version.outputs.version }}" >/dev/null 2>&1; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Bump patch version
-        if: steps.check_tag.outputs.exists == 'true'
-        run: |
-          npm version patch --no-git-tag-version
-          NEW_VERSION=$(node -p "require('./package.json').version")
-          git add package.json package-lock.json 2>/dev/null || git add package.json
-          git commit -m "chore: bump version to ${NEW_VERSION}"
-          git push
-
-      - name: Get final version
+      - name: Get version from package.json
         id: version
         run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
+      - name: Check if version already deployed
+        id: check_tag
+        run: |
+          if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "::notice::Version v${{ steps.version.outputs.version }} already deployed, skipping."
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "::notice::New version v${{ steps.version.outputs.version }} detected, deploying."
+          fi
+
+      - name: Setup Node.js
+        if: steps.check_tag.outputs.exists == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
       - name: Install dependencies
+        if: steps.check_tag.outputs.exists == 'false'
         run: npm ci
 
       - name: Build
+        if: steps.check_tag.outputs.exists == 'false'
         run: npm run build
 
       - name: Generate SRI hash
+        if: steps.check_tag.outputs.exists == 'false'
         id: sri
         run: |
           HASH=$(openssl dgst -sha384 -binary dist/bigcommerce-agent-sdk.min.js | openssl base64 -A)
           echo "sha384-${HASH}" > dist/sha384.txt
           echo "hash=sha384-${HASH}" >> $GITHUB_OUTPUT
 
+      - name: Configure git
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: Create version tag
+        if: steps.check_tag.outputs.exists == 'false'
         run: |
           git tag -a "v${{ steps.version.outputs.version }}" -m "Release v${{ steps.version.outputs.version }}"
           git push origin "v${{ steps.version.outputs.version }}"
 
       - name: Create WebDAV directories
+        if: steps.check_tag.outputs.exists == 'false'
         run: |
-          # Create parent directory (ignore error if exists)
           curl -X MKCOL --digest \
             -u "${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}:${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}" \
             "https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav/content/runtype-bc-graphql-sdk/" \
             || true
-
-          # Create versioned directory
           curl -X MKCOL --digest \
             -u "${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}:${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}" \
             "https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav/content/runtype-bc-graphql-sdk/${{ steps.version.outputs.version }}/" \
             || true
-
-          # Create latest directory
           curl -X MKCOL --digest \
             -u "${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}:${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}" \
             "https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav/content/runtype-bc-graphql-sdk/latest/" \
             || true
 
       - name: Upload to versioned path
+        if: steps.check_tag.outputs.exists == 'false'
         run: |
           curl -T dist/bigcommerce-agent-sdk.min.js --digest \
             -u "${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}:${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}" \
             "https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav/content/runtype-bc-graphql-sdk/${{ steps.version.outputs.version }}/sdk.min.js" \
             --fail-with-body
-
           curl -T dist/sha384.txt --digest \
             -u "${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}:${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}" \
             "https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav/content/runtype-bc-graphql-sdk/${{ steps.version.outputs.version }}/sha384.txt" \
             --fail-with-body
 
       - name: Upload to latest path
+        if: steps.check_tag.outputs.exists == 'false'
         run: |
           curl -T dist/bigcommerce-agent-sdk.min.js --digest \
             -u "${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}:${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}" \
             "https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav/content/runtype-bc-graphql-sdk/latest/sdk.min.js" \
             --fail-with-body
-
           curl -T dist/sha384.txt --digest \
             -u "${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}:${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}" \
             "https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav/content/runtype-bc-graphql-sdk/latest/sha384.txt" \
             --fail-with-body
 
-      - name: Output CDN URLs
+      - name: Summary
+        if: steps.check_tag.outputs.exists == 'false'
         run: |
-          echo "## CDN URLs" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Deployed v${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Versioned:**" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "https://cdn11.bigcommerce.com/s-dvzxci70mm/content/runtype-bc-graphql-sdk/${{ steps.version.outputs.version }}/sdk.min.js" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "\`https://cdn11.bigcommerce.com/s-dvzxci70mm/content/runtype-bc-graphql-sdk/${{ steps.version.outputs.version }}/sdk.min.js\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Latest:**" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "https://cdn11.bigcommerce.com/s-dvzxci70mm/content/runtype-bc-graphql-sdk/latest/sdk.min.js" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "\`https://cdn11.bigcommerce.com/s-dvzxci70mm/content/runtype-bc-graphql-sdk/latest/sdk.min.js\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**SRI Hash:**" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.sri.outputs.hash }}" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "\`${{ steps.sri.outputs.hash }}\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Summary (skipped)
+        if: steps.check_tag.outputs.exists == 'true'
+        run: |
+          echo "## ⏭️ Skipped - v${{ steps.version.outputs.version }} already deployed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "To deploy a new version, bump the version in \`package.json\`." >> $GITHUB_STEP_SUMMARY
