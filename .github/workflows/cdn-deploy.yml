@@ -73,7 +73,7 @@ jobs:
         uses: XPH0816/webdav-deploy-action@v1
         with:
           url: https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav
-          username: nathan@runtype.com
+          username: ${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}
           password: ${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}
           local: cdn-upload
           remote: /content/runtype-bc-graphql-sdk/${{ steps.version.outputs.version }}
@@ -82,7 +82,7 @@ jobs:
         uses: XPH0816/webdav-deploy-action@v1
         with:
           url: https://${{ secrets.BIGCOMMERCE_WEBDAV_HOST }}/dav
-          username: nathan@runtype.com
+          username: ${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}
           password: ${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}
           local: cdn-upload
           remote: /content/runtype-bc-graphql-sdk/latest
