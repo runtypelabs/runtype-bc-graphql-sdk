@@ -23,53 +23,44 @@ jobs:
         run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
       - name: Check if version already deployed
-        id: check_tag
+        id: check_deployed
         run: |
-          if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+          # Check if the SDK file already exists on CDN for this version
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://cdn11.bigcommerce.com/s-dvzxci70mm/content/runtype-bc-graphql-sdk/${{ steps.version.outputs.version }}/sdk.min.js")
+          if [ "$HTTP_STATUS" = "200" ]; then
             echo "exists=true" >> $GITHUB_OUTPUT
-            echo "::notice::Version v${{ steps.version.outputs.version }} already deployed, skipping."
+            echo "::notice::Version v${{ steps.version.outputs.version }} already deployed to CDN, skipping."
           else
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "::notice::New version v${{ steps.version.outputs.version }} detected, deploying."
+            echo "::notice::New version v${{ steps.version.outputs.version }} detected, deploying to CDN."
           fi
 
       - name: Setup Node.js
-        if: steps.check_tag.outputs.exists == 'false'
+        if: steps.check_deployed.outputs.exists == 'false'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
-        if: steps.check_tag.outputs.exists == 'false'
+        if: steps.check_deployed.outputs.exists == 'false'
         run: npm ci
 
       - name: Build
-        if: steps.check_tag.outputs.exists == 'false'
+        if: steps.check_deployed.outputs.exists == 'false'
         run: npm run build
 
       - name: Generate SRI hash
-        if: steps.check_tag.outputs.exists == 'false'
+        if: steps.check_deployed.outputs.exists == 'false'
         id: sri
         run: |
           HASH=$(openssl dgst -sha384 -binary dist/bigcommerce-agent-sdk.min.js | openssl base64 -A)
           echo "sha384-${HASH}" > dist/sha384.txt
           echo "hash=sha384-${HASH}" >> $GITHUB_OUTPUT
 
-      - name: Configure git
-        if: steps.check_tag.outputs.exists == 'false'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Create version tag
-        if: steps.check_tag.outputs.exists == 'false'
-        run: |
-          git tag -a "v${{ steps.version.outputs.version }}" -m "Release v${{ steps.version.outputs.version }}"
-          git push origin "v${{ steps.version.outputs.version }}"
-
       - name: Create WebDAV directories
-        if: steps.check_tag.outputs.exists == 'false'
+        if: steps.check_deployed.outputs.exists == 'false'
         run: |
           curl -X MKCOL --digest \
             -u "${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}:${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}" \
@@ -85,7 +76,7 @@ jobs:
             || true
 
       - name: Upload to versioned path
-        if: steps.check_tag.outputs.exists == 'false'
+        if: steps.check_deployed.outputs.exists == 'false'
         run: |
           curl -T dist/bigcommerce-agent-sdk.min.js --digest \
             -u "${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}:${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}" \
@@ -97,7 +88,7 @@ jobs:
             --fail-with-body
 
       - name: Upload to latest path
-        if: steps.check_tag.outputs.exists == 'false'
+        if: steps.check_deployed.outputs.exists == 'false'
         run: |
           curl -T dist/bigcommerce-agent-sdk.min.js --digest \
             -u "${{ secrets.BIGCOMMERCE_WEBDAV_USERNAME }}:${{ secrets.BIGCOMMERCE_WEBDAV_PASSWORD }}" \
@@ -109,7 +100,7 @@ jobs:
             --fail-with-body
 
       - name: Summary
-        if: steps.check_tag.outputs.exists == 'false'
+        if: steps.check_deployed.outputs.exists == 'false'
         run: |
           echo "## 🚀 Deployed v${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -123,7 +114,7 @@ jobs:
           echo "\`${{ steps.sri.outputs.hash }}\`" >> $GITHUB_STEP_SUMMARY
 
       - name: Summary (skipped)
-        if: steps.check_tag.outputs.exists == 'true'
+        if: steps.check_deployed.outputs.exists == 'true'
         run: |
           echo "## ⏭️ Skipped - v${{ steps.version.outputs.version }} already deployed" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
