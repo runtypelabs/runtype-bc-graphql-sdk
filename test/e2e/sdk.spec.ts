@@ -428,6 +428,98 @@ test.describe.serial('Customer Account - Unauthenticated', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Web Content Pages Tests
+// ---------------------------------------------------------------------------
+test.describe.serial('Web Content Pages', () => {
+  let page: Page
+  let firstPageId: number | null = null
+
+  test.beforeAll(async ({ browser }) => {
+    page = await browser.newPage()
+    await initSDK(page)
+  })
+
+  test.afterAll(async () => {
+    await page.close()
+  })
+
+  test('getWebPages returns list of content pages', async () => {
+    const pages = await page.evaluate(async () => {
+      const sdk = (window as any).sdk
+      return await sdk.getWebPages()
+    })
+
+    expect(Array.isArray(pages)).toBe(true)
+    // Store first page ID for subsequent test
+    if (pages.length > 0) {
+      firstPageId = pages[0].entityId
+    }
+  })
+
+  test('getWebPages returns page summaries with expected fields', async () => {
+    const pages = await page.evaluate(async () => {
+      const sdk = (window as any).sdk
+      return await sdk.getWebPages()
+    })
+
+    if (pages.length === 0) {
+      // Store may not have any web pages - that's OK
+      return
+    }
+
+    const firstPage = pages[0]
+    expect(firstPage.entityId).toBeDefined()
+    expect(firstPage.name).toBeDefined()
+    expect(firstPage.type).toBeDefined()
+    // Path or link should be present depending on page type
+    expect(firstPage.path !== undefined || firstPage.link !== undefined).toBe(true)
+  })
+
+  test('getWebPage returns full page content by ID', async () => {
+    if (!firstPageId) {
+      // No pages to test with
+      return
+    }
+
+    const pageDetail = await page.evaluate(async (entityId) => {
+      const sdk = (window as any).sdk
+      return await sdk.getWebPage(entityId)
+    }, firstPageId)
+
+    expect(pageDetail).not.toBeNull()
+    expect(pageDetail.entityId).toBe(firstPageId)
+    expect(pageDetail.name).toBeDefined()
+    expect(pageDetail.type).toBeDefined()
+  })
+
+  test('getWebPage returns null for non-existent page', async () => {
+    const pageDetail = await page.evaluate(async () => {
+      const sdk = (window as any).sdk
+      return await sdk.getWebPage(999999999)
+    })
+
+    expect(pageDetail).toBeNull()
+  })
+
+  test('getWebPages with filters by entityIds', async () => {
+    if (!firstPageId) {
+      // No pages to test with
+      return
+    }
+
+    const pages = await page.evaluate(async (entityId) => {
+      const sdk = (window as any).sdk
+      return await sdk.getWebPages({ entityIds: [entityId] })
+    }, firstPageId)
+
+    // Should return only the filtered page
+    if (pages.length > 0) {
+      expect(pages.some((p: any) => p.entityId === firstPageId)).toBe(true)
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Customer Account Tests - Authenticated
 // ---------------------------------------------------------------------------
 test.describe.serial('Customer Account - Authenticated', () => {

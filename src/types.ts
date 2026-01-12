@@ -574,3 +574,66 @@ export interface AddCustomerAddressInput {
   phone?: string
   postalCode: string
 }
+
+// ---------------------------------------------------------------------------
+// Web Content Page Types
+// ---------------------------------------------------------------------------
+
+export type WebPageType = 'NormalPage' | 'ContactPage' | 'ExternalLinkPage' | 'BlogIndexPage' | 'RawPage'
+
+export interface WebPageBase {
+  entityId: number
+  name: string
+  __typename: WebPageType
+}
+
+export interface ContactPage extends WebPageBase {
+  __typename: 'ContactPage'
+  path: string
+}
+
+export interface ExternalLinkPage extends WebPageBase {
+  __typename: 'ExternalLinkPage'
+  link: string
+}
+
+export interface NormalPage extends WebPageBase {
+  __typename: 'NormalPage'
+  path: string
+  plainTextSummary?: string
+  htmlBody?: string
+  parentEntityId?: number
+  children?: WebPageChild[]
+}
+
+export interface WebPageChild {
+  name: string
+  path?: string
+}
+
+export type WebPage = ContactPage | ExternalLinkPage | NormalPage | WebPageBase
+
+export interface WebPageSummary {
+  entityId: number
+  name: string
+  type: WebPageType
+  path?: string
+  link?: string
+  plainTextSummary?: string
+}
+
+export interface WebPageDetail {
+  entityId: number
+  name: string
+  type: WebPageType
+  path?: string
+  htmlBody?: string
+  plainTextSummary?: string
+  parentEntityId?: number
+  children?: WebPageChild[]
+}
+
+export interface WebPagesFiltersInput {
+  entityIds?: number[]
+  pageType?: WebPageType
+}

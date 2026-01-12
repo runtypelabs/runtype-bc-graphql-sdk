@@ -980,6 +980,72 @@ export const GET_CUSTOMER_WISHLISTS = `
   }
 `
 
+// ---------------------------------------------------------------------------
+// Web Content Page Queries
+// ---------------------------------------------------------------------------
+
+export const GET_WEB_PAGES = `
+  query GetWebPages($filters: WebPagesFiltersInput) {
+    site {
+      content {
+        pages(filters: $filters) {
+          edges {
+            node {
+              entityId
+              name
+              __typename
+              ... on ContactPage {
+                path
+              }
+              ... on ExternalLinkPage {
+                link
+              }
+              ... on NormalPage {
+                path
+                plainTextSummary(characterLimit: 100)
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`
+
+export const GET_WEB_PAGE = `
+  query GetWebPage($entityId: Int!) {
+    site {
+      content {
+        page(entityId: $entityId) {
+          name
+          parentEntityId
+          entityId
+          __typename
+          children {
+            edges {
+              node {
+                name
+                ... on NormalPage {
+                  path
+                }
+              }
+            }
+          }
+          ... on NormalPage {
+            name
+            htmlBody
+            plainTextSummary
+            path
+          }
+          ... on ContactPage {
+            path
+          }
+        }
+      }
+    }
+  }
+`
+
 export const QUERIES = {
   SEARCH_PRODUCTS,
   GET_PRODUCT_BY_ID,
@@ -993,4 +1059,6 @@ export const QUERIES = {
   GET_CUSTOMER_ORDERS,
   GET_ORDER_DETAILS,
   GET_CUSTOMER_WISHLISTS,
+  GET_WEB_PAGES,
+  GET_WEB_PAGE,
 }

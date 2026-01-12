@@ -142,7 +142,8 @@
       customer: null,
       testAddressId: null,
       testWishlistId: null,
-      testWishlistItemId: null
+      testWishlistItemId: null,
+      firstWebPageId: null
     };
 
     // Test runner
@@ -509,6 +510,73 @@
             hasEmbeddedUrl: !!urls.embeddedCheckoutUrl,
             checkoutUrl: urls.redirectedCheckoutUrl?.substring(0, 80) + '...',
             _showCheckoutButton: true
+          };
+        }
+      }
+    ]);
+
+    runner.suite('Web Content Pages', [
+      {
+        name: 'Get all web content pages',
+        fn: async () => {
+          const pages = await sdk.getWebPages();
+          if (pages.length > 0) {
+            testState.firstWebPageId = pages[0].entityId;
+          }
+          return {
+            count: pages.length,
+            pages: pages.slice(0, 5).map(p => ({
+              id: p.entityId,
+              name: p.name,
+              type: p.type,
+              path: p.path || p.link
+            }))
+          };
+        }
+      },
+      {
+        name: 'Get web page by ID (full content)',
+        fn: async () => {
+          if (!testState.firstWebPageId) {
+            return { skipped: true, message: 'No web pages available to fetch' };
+          }
+          const page = await sdk.getWebPage(testState.firstWebPageId);
+          if (!page) {
+            return { skipped: true, message: 'Page not found' };
+          }
+          return {
+            id: page.entityId,
+            name: page.name,
+            type: page.type,
+            path: page.path,
+            hasHtmlBody: !!page.htmlBody,
+            htmlBodyPreview: page.htmlBody?.substring(0, 200) + '...',
+            plainTextSummary: page.plainTextSummary,
+            parentEntityId: page.parentEntityId,
+            childrenCount: page.children?.length || 0
+          };
+        }
+      },
+      {
+        name: 'Get web pages with filter',
+        fn: async () => {
+          if (!testState.firstWebPageId) {
+            return { skipped: true, message: 'No web pages available to filter' };
+          }
+          const pages = await sdk.getWebPages({ entityIds: [testState.firstWebPageId] });
+          return {
+            filteredCount: pages.length,
+            matchesFilter: pages.some(p => p.entityId === testState.firstWebPageId)
+          };
+        }
+      },
+      {
+        name: 'Get non-existent web page returns null',
+        fn: async () => {
+          const page = await sdk.getWebPage(999999999);
+          return {
+            result: page,
+            isNull: page === null
           };
         }
       }

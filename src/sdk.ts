@@ -26,6 +26,11 @@ import {
   OrderSummary,
   Wishlist,
   WishlistItem,
+  WebPageSummary,
+  WebPageDetail,
+  WebPagesFiltersInput,
+  WebPageType,
+  WebPageChild,
 } from './types'
 
 import { QUERIES } from './queries'
@@ -1011,6 +1016,83 @@ export class BigCommerceAgentSDK {
       name: result.result.name,
       isPublic: false,
       items: [],
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Web Content Pages
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Get web content pages (summaries with titles and URLs)
+   * Can optionally filter by entityIds or pageType
+   */
+  async getWebPages(filters?: WebPagesFiltersInput): Promise<WebPageSummary[]> {
+    const data = await this.executeGraphQL<{
+      site: {
+        content: {
+          pages: Connection<{
+            entityId: number
+            name: string
+            __typename: WebPageType
+            path?: string
+            link?: string
+            plainTextSummary?: string
+          }>
+        }
+      }
+    }>(QUERIES.GET_WEB_PAGES, { filters: filters || null })
+
+    if (!data?.site?.content?.pages) {
+      return []
+    }
+
+    return this.flattenEdges(data.site.content.pages).map((page) => ({
+      entityId: page.entityId,
+      name: page.name,
+      type: page.__typename,
+      path: page.path,
+      link: page.link,
+      plainTextSummary: page.plainTextSummary,
+    }))
+  }
+
+  /**
+   * Get a single web content page by entityId (with full HTML content)
+   */
+  async getWebPage(entityId: number): Promise<WebPageDetail | null> {
+    const data = await this.executeGraphQL<{
+      site: {
+        content: {
+          page: {
+            entityId: number
+            name: string
+            __typename: WebPageType
+            path?: string
+            htmlBody?: string
+            plainTextSummary?: string
+            parentEntityId?: number
+            children?: Connection<WebPageChild>
+          } | null
+        }
+      }
+    }>(QUERIES.GET_WEB_PAGE, { entityId: Number(entityId) })
+
+    const page = data?.site?.content?.page
+
+    if (!page) {
+      return null
+    }
+
+    return {
+      entityId: page.entityId,
+      name: page.name,
+      type: page.__typename,
+      path: page.path,
+      htmlBody: page.htmlBody,
+      plainTextSummary: page.plainTextSummary,
+      parentEntityId: page.parentEntityId,
+      children: page.children ? this.flattenEdges(page.children) : undefined,
     }
   }
 }
