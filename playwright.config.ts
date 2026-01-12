@@ -10,10 +10,11 @@ export default defineConfig({
   timeout: 60000,
 
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: 'https://localhost:3000',
     trace: 'on-first-retry',
     video: 'retain-on-failure',
     screenshot: 'only-on-failure',
+    ignoreHTTPSErrors: true,
   },
 
   projects: [
@@ -25,8 +26,9 @@ export default defineConfig({
 
   webServer: {
     command: 'node test/server.mjs',
-    url: 'http://localhost:3000',
+    url: 'https://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 10000,
+    ignoreHTTPSErrors: true,
   },
 })

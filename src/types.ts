@@ -417,3 +417,160 @@ export interface OptionValueId {
   optionEntityId: number
   valueEntityId: number
 }
+
+// ---------------------------------------------------------------------------
+// Customer Types
+// ---------------------------------------------------------------------------
+
+export interface CustomerAddress {
+  entityId: number
+  firstName: string
+  lastName: string
+  address1: string
+  address2?: string
+  city: string
+  company?: string
+  countryCode: string
+  stateOrProvince: string
+  phone?: string
+  postalCode: string
+}
+
+export interface Customer {
+  entityId: number
+  email: string
+  firstName: string
+  lastName: string
+  phone?: string
+  company?: string
+  customerGroupId?: number
+  customerGroupName?: string
+  storeCredit?: Money
+  addressCount?: number
+  addresses?: CustomerAddress[]
+  isSubscribedToNewsletter?: boolean
+}
+
+// ---------------------------------------------------------------------------
+// Order Types
+// ---------------------------------------------------------------------------
+
+export interface OrderAddress {
+  firstName: string
+  lastName: string
+  email?: string
+  company?: string
+  address1: string
+  address2?: string
+  city: string
+  stateOrProvince: string
+  postalCode: string
+  countryCode: string
+  phone?: string
+}
+
+export interface OrderLineItem {
+  entityId: number
+  productEntityId: number
+  variantEntityId?: number
+  name: string
+  sku: string
+  quantity: number
+  priceBeforeDiscount: Money
+  priceAfterDiscount: Money
+  imageUrl?: string
+  selectedOptions?: Array<{
+    name: string
+    value: string
+  }>
+}
+
+export interface OrderConsignment {
+  entityId: number
+  shippingAddress: OrderAddress
+  lineItems: OrderLineItem[]
+  shippingCost: Money
+  handlingCost?: Money
+  status: string
+  trackingNumber?: string
+  trackingUrl?: string
+}
+
+export interface Order {
+  entityId: number
+  orderedAt: string
+  updatedAt: string
+  status: {
+    value: string
+    label: string
+  }
+  billingAddress: OrderAddress
+  consignments?: OrderConsignment[]
+  subTotal: Money
+  discounts?: Array<{
+    couponCode?: string
+    discountedAmount: Money
+  }>
+  shippingCostTotal: Money
+  taxTotal: Money
+  totalIncTax: Money
+  customerMessage?: string
+}
+
+export interface OrderSummary {
+  entityId: number
+  orderedAt: string
+  status: string
+  total: Money
+  itemCount: number
+}
+
+// ---------------------------------------------------------------------------
+// Wishlist Types
+// ---------------------------------------------------------------------------
+
+export interface WishlistItem {
+  entityId: number
+  productEntityId: number
+  variantEntityId?: number
+  product: {
+    entityId: number
+    name: string
+    path: string
+    prices?: Prices
+    defaultImage?: Image
+  }
+}
+
+export interface Wishlist {
+  entityId: number
+  name: string
+  isPublic: boolean
+  token?: string
+  items: WishlistItem[]
+}
+
+// ---------------------------------------------------------------------------
+// Customer Input Types
+// ---------------------------------------------------------------------------
+
+export interface UpdateCustomerInput {
+  firstName?: string
+  lastName?: string
+  email?: string
+  phone?: string
+  company?: string
+}
+
+export interface AddCustomerAddressInput {
+  firstName: string
+  lastName: string
+  address1: string
+  address2?: string
+  city: string
+  company?: string
+  countryCode: string
+  stateOrProvince: string
+  phone?: string
+  postalCode: string
+}

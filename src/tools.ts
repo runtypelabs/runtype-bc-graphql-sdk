@@ -7,7 +7,7 @@
  */
 
 import type { BigCommerceAgentSDK } from './sdk'
-import type { Product, OptionValueId, SortOrder } from './types'
+import type { Product, OptionValueId, SortOrder, UpdateCustomerInput, AddCustomerAddressInput } from './types'
 
 // Tool definition types
 export interface ToolParameterSchema {
@@ -498,6 +498,277 @@ Use this to answer questions about the store itself.`,
     parametersSchema: {
       type: 'object',
       properties: {},
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // Customer Account Tools
+  // ---------------------------------------------------------------------------
+
+  check_login_status: {
+    name: 'check_login_status',
+    description: `Check if a customer is currently logged in to the store. Returns customer profile if logged in, or null if not.
+
+Use this FIRST before any customer account operations to verify the user is authenticated.
+
+If not logged in, you should guide the user to log in before accessing account features.`,
+    toolType: 'local' as const,
+    parametersSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  get_customer_profile: {
+    name: 'get_customer_profile',
+    description: `Get the current logged-in customer's profile information including:
+- Name (first and last)
+- Email address
+- Phone number
+- Company name
+- Customer group
+- Store credit balance
+- Number of saved addresses
+
+Use this when the user asks about their account, profile, or personal information.`,
+    toolType: 'local' as const,
+    parametersSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  update_customer_profile: {
+    name: 'update_customer_profile',
+    description: `Update the logged-in customer's profile information. Can update:
+- First name
+- Last name
+- Email address
+- Phone number
+- Company name
+
+Requires customer to be logged in.`,
+    toolType: 'local' as const,
+    parametersSchema: {
+      type: 'object',
+      properties: {
+        firstName: {
+          type: 'string',
+          description: "Customer's first name",
+        },
+        lastName: {
+          type: 'string',
+          description: "Customer's last name",
+        },
+        email: {
+          type: 'string',
+          description: "Customer's email address",
+        },
+        phone: {
+          type: 'string',
+          description: "Customer's phone number",
+        },
+        company: {
+          type: 'string',
+          description: "Customer's company name",
+        },
+      },
+    },
+  },
+
+  get_customer_addresses: {
+    name: 'get_customer_addresses',
+    description: `Get all saved addresses for the logged-in customer. Returns address book with:
+- Full address details (street, city, state, zip, country)
+- Contact name and phone for each address
+- Address ID for use in orders or updates
+
+Use when user asks about their addresses, shipping addresses, or address book.`,
+    toolType: 'local' as const,
+    parametersSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  add_customer_address: {
+    name: 'add_customer_address',
+    description: `Add a new address to the customer's address book. Required fields:
+- firstName, lastName
+- address1, city, stateOrProvince, postalCode, countryCode
+
+Optional: address2, company, phone
+
+Use when user wants to save a new shipping or billing address.`,
+    toolType: 'local' as const,
+    parametersSchema: {
+      type: 'object',
+      properties: {
+        firstName: { type: 'string', description: 'First name for this address' },
+        lastName: { type: 'string', description: 'Last name for this address' },
+        address1: { type: 'string', description: 'Street address line 1' },
+        address2: { type: 'string', description: 'Street address line 2 (optional)' },
+        city: { type: 'string', description: 'City' },
+        stateOrProvince: { type: 'string', description: 'State or province' },
+        postalCode: { type: 'string', description: 'ZIP or postal code' },
+        countryCode: { type: 'string', description: 'Two-letter country code (e.g., US, CA, GB)' },
+        company: { type: 'string', description: 'Company name (optional)' },
+        phone: { type: 'string', description: 'Phone number (optional)' },
+      },
+      required: ['firstName', 'lastName', 'address1', 'city', 'stateOrProvince', 'postalCode', 'countryCode'],
+    },
+  },
+
+  update_customer_address: {
+    name: 'update_customer_address',
+    description: `Update an existing address in the customer's address book. Requires the addressEntityId.
+
+Get the addressEntityId from get_customer_addresses first.`,
+    toolType: 'local' as const,
+    parametersSchema: {
+      type: 'object',
+      properties: {
+        addressEntityId: { type: 'number', description: 'The address ID to update (from get_customer_addresses)' },
+        firstName: { type: 'string' },
+        lastName: { type: 'string' },
+        address1: { type: 'string' },
+        address2: { type: 'string' },
+        city: { type: 'string' },
+        stateOrProvince: { type: 'string' },
+        postalCode: { type: 'string' },
+        countryCode: { type: 'string' },
+        company: { type: 'string' },
+        phone: { type: 'string' },
+      },
+      required: ['addressEntityId'],
+    },
+  },
+
+  delete_customer_address: {
+    name: 'delete_customer_address',
+    description: `Delete an address from the customer's address book. Requires the addressEntityId.
+
+Get the addressEntityId from get_customer_addresses first.`,
+    toolType: 'local' as const,
+    parametersSchema: {
+      type: 'object',
+      properties: {
+        addressEntityId: {
+          type: 'number',
+          description: 'The address ID to delete (from get_customer_addresses)',
+        },
+      },
+      required: ['addressEntityId'],
+    },
+  },
+
+  get_order_history: {
+    name: 'get_order_history',
+    description: `Get the customer's order history. Returns a list of orders with:
+- Order ID and date
+- Order status (e.g., Pending, Shipped, Completed)
+- Order total
+
+Use when user asks "what are my orders", "show my order history", "did my order ship", etc.
+
+For full order details, use get_order_details with a specific order ID.`,
+    toolType: 'local' as const,
+    parametersSchema: {
+      type: 'object',
+      properties: {
+        limit: {
+          type: 'number',
+          default: 20,
+          description: 'Maximum number of orders to return (default: 20)',
+        },
+      },
+    },
+  },
+
+  get_order_details: {
+    name: 'get_order_details',
+    description: `Get detailed information about a specific order including:
+- All items ordered with quantities and prices
+- Billing and shipping addresses
+- Shipping cost and tax
+- Order status and any customer notes
+- Tracking information (if available)
+
+Use when user asks about a specific order, "where is my order", or needs invoice/receipt details.`,
+    toolType: 'local' as const,
+    parametersSchema: {
+      type: 'object',
+      properties: {
+        orderId: {
+          type: 'number',
+          description: 'The order ID to get details for (from get_order_history)',
+        },
+      },
+      required: ['orderId'],
+    },
+  },
+
+  get_wishlists: {
+    name: 'get_wishlists',
+    description: `Get all of the customer's wishlists with their items. Returns:
+- Wishlist names and IDs
+- Products in each wishlist with names, prices, and images
+- Whether each wishlist is public or private
+
+Use when user asks about their wishlist, saved items, or favorites.`,
+    toolType: 'local' as const,
+    parametersSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  add_to_wishlist: {
+    name: 'add_to_wishlist',
+    description: `Add a product to one of the customer's wishlists.
+
+Requires the wishlistEntityId (from get_wishlists) and productEntityId.`,
+    toolType: 'local' as const,
+    parametersSchema: {
+      type: 'object',
+      properties: {
+        wishlistEntityId: {
+          type: 'number',
+          description: 'The wishlist ID to add to (from get_wishlists)',
+        },
+        productEntityId: {
+          type: 'number',
+          description: 'The product ID to add',
+        },
+        variantEntityId: {
+          type: 'number',
+          description: 'Optional: specific variant ID if product has variants',
+        },
+      },
+      required: ['wishlistEntityId', 'productEntityId'],
+    },
+  },
+
+  remove_from_wishlist: {
+    name: 'remove_from_wishlist',
+    description: `Remove items from a wishlist.
+
+Requires the wishlistEntityId and the itemEntityIds (wishlist item IDs, not product IDs).`,
+    toolType: 'local' as const,
+    parametersSchema: {
+      type: 'object',
+      properties: {
+        wishlistEntityId: {
+          type: 'number',
+          description: 'The wishlist ID (from get_wishlists)',
+        },
+        itemEntityIds: {
+          type: 'array',
+          items: { type: 'number' },
+          description: 'Array of wishlist item IDs to remove (from get_wishlists items)',
+        },
+      },
+      required: ['wishlistEntityId', 'itemEntityIds'],
     },
   },
 } as const
@@ -1024,6 +1295,392 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           success: false,
           error: (error as Error).message,
           errorType: 'STORE_INFO_ERROR',
+        }
+      }
+    },
+
+    // -------------------------------------------------------------------------
+    // Customer Account Tool Implementations
+    // -------------------------------------------------------------------------
+
+    async check_login_status(): Promise<ToolResult> {
+      try {
+        const customer = await sdk.isLoggedIn()
+
+        if (!customer) {
+          return {
+            success: true,
+            data: {
+              isLoggedIn: false,
+              message: 'Customer is not logged in. Please log in to access account features.',
+            },
+          }
+        }
+
+        return {
+          success: true,
+          data: {
+            isLoggedIn: true,
+            customer: {
+              id: customer.entityId,
+              email: customer.email,
+              firstName: customer.firstName,
+              lastName: customer.lastName,
+            },
+          },
+        }
+      } catch (error) {
+        return {
+          success: false,
+          error: (error as Error).message,
+          errorType: 'AUTH_CHECK_ERROR',
+        }
+      }
+    },
+
+    async get_customer_profile(): Promise<ToolResult> {
+      try {
+        const customer = await sdk.getCustomer()
+
+        if (!customer) {
+          return {
+            success: false,
+            error: 'Not logged in',
+            errorType: 'NOT_LOGGED_IN',
+            hint: 'Customer must be logged in to view profile',
+          }
+        }
+
+        return {
+          success: true,
+          data: {
+            id: customer.entityId,
+            email: customer.email,
+            firstName: customer.firstName,
+            lastName: customer.lastName,
+            phone: customer.phone,
+            company: customer.company,
+            customerGroup: customer.customerGroupName,
+            storeCredit: customer.storeCredit,
+            addressCount: customer.addressCount,
+            isSubscribedToNewsletter: customer.isSubscribedToNewsletter,
+          },
+        }
+      } catch (error) {
+        return {
+          success: false,
+          error: (error as Error).message,
+          errorType: 'PROFILE_ERROR',
+        }
+      }
+    },
+
+    async update_customer_profile(args: UpdateCustomerInput): Promise<ToolResult> {
+      try {
+        const updated = await sdk.updateCustomer(args)
+
+        if (!updated) {
+          return {
+            success: false,
+            error: 'Failed to update profile',
+            errorType: 'UPDATE_ERROR',
+          }
+        }
+
+        return {
+          success: true,
+          data: {
+            message: 'Profile updated successfully',
+            customer: {
+              firstName: updated.firstName,
+              lastName: updated.lastName,
+              email: updated.email,
+              phone: updated.phone,
+              company: updated.company,
+            },
+          },
+        }
+      } catch (error) {
+        return {
+          success: false,
+          error: (error as Error).message,
+          errorType: 'UPDATE_ERROR',
+        }
+      }
+    },
+
+    async get_customer_addresses(): Promise<ToolResult> {
+      try {
+        const addresses = await sdk.getCustomerAddresses()
+
+        return {
+          success: true,
+          data: {
+            addressCount: addresses.length,
+            addresses: addresses.map((addr) => ({
+              id: addr.entityId,
+              name: `${addr.firstName} ${addr.lastName}`,
+              address1: addr.address1,
+              address2: addr.address2,
+              city: addr.city,
+              stateOrProvince: addr.stateOrProvince,
+              postalCode: addr.postalCode,
+              countryCode: addr.countryCode,
+              company: addr.company,
+              phone: addr.phone,
+            })),
+          },
+        }
+      } catch (error) {
+        return {
+          success: false,
+          error: (error as Error).message,
+          errorType: 'ADDRESS_ERROR',
+        }
+      }
+    },
+
+    async add_customer_address(args: AddCustomerAddressInput): Promise<ToolResult> {
+      try {
+        const address = await sdk.addCustomerAddress(args)
+
+        if (!address) {
+          return {
+            success: false,
+            error: 'Failed to add address',
+            errorType: 'ADD_ADDRESS_ERROR',
+          }
+        }
+
+        return {
+          success: true,
+          data: {
+            message: 'Address added successfully',
+            address: {
+              id: address.entityId,
+              fullAddress: `${address.address1}, ${address.city}, ${address.stateOrProvince} ${address.postalCode}`,
+            },
+          },
+        }
+      } catch (error) {
+        return {
+          success: false,
+          error: (error as Error).message,
+          errorType: 'ADD_ADDRESS_ERROR',
+        }
+      }
+    },
+
+    async update_customer_address(
+      args: { addressEntityId: number } & Partial<AddCustomerAddressInput>
+    ): Promise<ToolResult> {
+      try {
+        const { addressEntityId, ...input } = args
+        const address = await sdk.updateCustomerAddress(addressEntityId, input)
+
+        if (!address) {
+          return {
+            success: false,
+            error: 'Failed to update address',
+            errorType: 'UPDATE_ADDRESS_ERROR',
+          }
+        }
+
+        return {
+          success: true,
+          data: {
+            message: 'Address updated successfully',
+            address: {
+              id: address.entityId,
+            },
+          },
+        }
+      } catch (error) {
+        return {
+          success: false,
+          error: (error as Error).message,
+          errorType: 'UPDATE_ADDRESS_ERROR',
+        }
+      }
+    },
+
+    async delete_customer_address(args: { addressEntityId: number }): Promise<ToolResult> {
+      try {
+        const deletedId = await sdk.deleteCustomerAddress(args.addressEntityId)
+
+        return {
+          success: true,
+          data: {
+            message: 'Address deleted successfully',
+            deletedAddressId: deletedId,
+          },
+        }
+      } catch (error) {
+        return {
+          success: false,
+          error: (error as Error).message,
+          errorType: 'DELETE_ADDRESS_ERROR',
+        }
+      }
+    },
+
+    async get_order_history(args: { limit?: number }): Promise<ToolResult> {
+      try {
+        const orders = await sdk.getCustomerOrders(args.limit || 20)
+
+        if (orders.length === 0) {
+          return {
+            success: true,
+            data: {
+              orderCount: 0,
+              orders: [],
+              message: 'No orders found',
+            },
+          }
+        }
+
+        return {
+          success: true,
+          data: {
+            orderCount: orders.length,
+            orders: orders.map((order) => ({
+              id: order.entityId,
+              date: order.orderedAt,
+              status: order.status,
+              total: order.total,
+            })),
+          },
+        }
+      } catch (error) {
+        return {
+          success: false,
+          error: (error as Error).message,
+          errorType: 'ORDER_HISTORY_ERROR',
+        }
+      }
+    },
+
+    async get_order_details(args: { orderId: number }): Promise<ToolResult> {
+      try {
+        const order = await sdk.getOrderDetails(args.orderId)
+
+        if (!order) {
+          return {
+            success: false,
+            error: `Order ${args.orderId} not found`,
+            errorType: 'NOT_FOUND',
+          }
+        }
+
+        return {
+          success: true,
+          data: {
+            id: order.entityId,
+            date: order.orderedAt,
+            status: order.status,
+            billingAddress: order.billingAddress,
+            consignments: order.consignments,
+            subTotal: order.subTotal,
+            shippingTotal: order.shippingCostTotal,
+            taxTotal: order.taxTotal,
+            total: order.totalIncTax,
+            customerMessage: order.customerMessage,
+            discounts: order.discounts,
+          },
+        }
+      } catch (error) {
+        return {
+          success: false,
+          error: (error as Error).message,
+          errorType: 'ORDER_DETAILS_ERROR',
+        }
+      }
+    },
+
+    async get_wishlists(): Promise<ToolResult> {
+      try {
+        const wishlists = await sdk.getCustomerWishlists()
+
+        return {
+          success: true,
+          data: {
+            wishlistCount: wishlists.length,
+            wishlists: wishlists.map((wl) => ({
+              id: wl.entityId,
+              name: wl.name,
+              isPublic: wl.isPublic,
+              itemCount: wl.items.length,
+              items: wl.items.map((item) => ({
+                itemId: item.entityId,
+                product: {
+                  id: item.product.entityId,
+                  name: item.product.name,
+                  path: item.product.path,
+                  price: item.product.prices?.price,
+                  imageUrl: item.product.defaultImage?.url,
+                },
+                variantId: item.variantEntityId,
+              })),
+            })),
+          },
+        }
+      } catch (error) {
+        return {
+          success: false,
+          error: (error as Error).message,
+          errorType: 'WISHLIST_ERROR',
+        }
+      }
+    },
+
+    async add_to_wishlist(args: {
+      wishlistEntityId: number
+      productEntityId: number
+      variantEntityId?: number
+    }): Promise<ToolResult> {
+      try {
+        const result = await sdk.addToWishlist(args.wishlistEntityId, [
+          {
+            productEntityId: args.productEntityId,
+            variantEntityId: args.variantEntityId,
+          },
+        ])
+
+        return {
+          success: true,
+          data: {
+            message: 'Item added to wishlist',
+            wishlistId: result?.entityId,
+          },
+        }
+      } catch (error) {
+        return {
+          success: false,
+          error: (error as Error).message,
+          errorType: 'ADD_WISHLIST_ERROR',
+        }
+      }
+    },
+
+    async remove_from_wishlist(args: {
+      wishlistEntityId: number
+      itemEntityIds: number[]
+    }): Promise<ToolResult> {
+      try {
+        const result = await sdk.removeFromWishlist(args.wishlistEntityId, args.itemEntityIds)
+
+        return {
+          success: true,
+          data: {
+            message: 'Items removed from wishlist',
+            wishlistId: result?.entityId,
+          },
+        }
+      } catch (error) {
+        return {
+          success: false,
+          error: (error as Error).message,
+          errorType: 'REMOVE_WISHLIST_ERROR',
         }
       }
     },

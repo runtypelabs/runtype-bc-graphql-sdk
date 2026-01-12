@@ -31,6 +31,7 @@
     "test:browser": "npm run build && node test/server.mjs",
     "test:e2e": "npm run build && npx playwright test",
     "test:e2e:ui": "npm run build && npx playwright test --ui",
+    "generate-certs": "mkdir -p test/certs && openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout test/certs/localhost.key -out test/certs/localhost.crt -subj '/CN=localhost'",
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "typecheck": "tsc --noEmit",

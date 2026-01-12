@@ -18,6 +18,14 @@ import {
   OptionValueId,
   QuickAddResult,
   Variant,
+  Customer,
+  CustomerAddress,
+  UpdateCustomerInput,
+  AddCustomerAddressInput,
+  Order,
+  OrderSummary,
+  Wishlist,
+  WishlistItem,
 } from './types'
 
 import { QUERIES } from './queries'
@@ -659,6 +667,307 @@ export class BigCommerceAgentSDK {
       discounts: cart.discountedAmount || null,
       total: cart.amount,
       currencyCode: cart.currencyCode,
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Customer Account Operations
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Check if a customer is currently logged in
+   * Returns customer data if logged in, null otherwise
+   */
+  async isLoggedIn(): Promise<Customer | null> {
+    try {
+      const data = await this.executeGraphQL<{
+        customer: Customer | null
+      }>(QUERIES.GET_CUSTOMER)
+
+      return data?.customer || null
+    } catch (error) {
+      this.log('Customer not logged in or error:', error)
+      return null
+    }
+  }
+
+  /**
+   * Get current customer profile
+   * Returns null if not logged in
+   */
+  async getCustomer(): Promise<Customer | null> {
+    const data = await this.executeGraphQL<{
+      customer: Customer | null
+    }>(QUERIES.GET_CUSTOMER)
+
+    return data?.customer || null
+  }
+
+  /**
+   * Update customer profile
+   */
+  async updateCustomer(input: UpdateCustomerInput): Promise<Customer | null> {
+    const data = await this.executeGraphQL<{
+      customer: {
+        updateCustomer: {
+          customer: Customer | null
+          errors: Array<{ message: string }>
+        }
+      }
+    }>(MUTATIONS.UPDATE_CUSTOMER, { input })
+
+    const result = data?.customer?.updateCustomer
+    if (result?.errors?.length > 0) {
+      throw new Error(result.errors.map((e) => e.message).join(', '))
+    }
+
+    return result?.customer || null
+  }
+
+  /**
+   * Get customer addresses
+   */
+  async getCustomerAddresses(): Promise<CustomerAddress[]> {
+    const data = await this.executeGraphQL<{
+      customer: {
+        addresses: Connection<CustomerAddress>
+      } | null
+    }>(QUERIES.GET_CUSTOMER_ADDRESSES)
+
+    if (!data?.customer?.addresses) {
+      return []
+    }
+
+    return this.flattenEdges(data.customer.addresses)
+  }
+
+  /**
+   * Add a new customer address
+   */
+  async addCustomerAddress(input: AddCustomerAddressInput): Promise<CustomerAddress | null> {
+    const data = await this.executeGraphQL<{
+      customer: {
+        addCustomerAddress: {
+          address: CustomerAddress | null
+          errors: Array<{ message: string }>
+        }
+      }
+    }>(MUTATIONS.ADD_CUSTOMER_ADDRESS, { input })
+
+    const result = data?.customer?.addCustomerAddress
+    if (result?.errors?.length > 0) {
+      throw new Error(result.errors.map((e) => e.message).join(', '))
+    }
+
+    return result?.address || null
+  }
+
+  /**
+   * Update an existing customer address
+   */
+  async updateCustomerAddress(
+    addressEntityId: number,
+    input: Partial<AddCustomerAddressInput>
+  ): Promise<CustomerAddress | null> {
+    const data = await this.executeGraphQL<{
+      customer: {
+        updateCustomerAddress: {
+          address: CustomerAddress | null
+          errors: Array<{ message: string }>
+        }
+      }
+    }>(MUTATIONS.UPDATE_CUSTOMER_ADDRESS, {
+      input: { addressEntityId, ...input },
+    })
+
+    const result = data?.customer?.updateCustomerAddress
+    if (result?.errors?.length > 0) {
+      throw new Error(result.errors.map((e) => e.message).join(', '))
+    }
+
+    return result?.address || null
+  }
+
+  /**
+   * Delete a customer address
+   */
+  async deleteCustomerAddress(addressEntityId: number): Promise<number | null> {
+    const data = await this.executeGraphQL<{
+      customer: {
+        deleteCustomerAddress: {
+          deletedAddressEntityId: number | null
+          errors: Array<{ message: string }>
+        }
+      }
+    }>(MUTATIONS.DELETE_CUSTOMER_ADDRESS, {
+      input: { addressEntityId },
+    })
+
+    const result = data?.customer?.deleteCustomerAddress
+    if (result?.errors?.length > 0) {
+      throw new Error(result.errors.map((e) => e.message).join(', '))
+    }
+
+    return result?.deletedAddressEntityId || null
+  }
+
+  /**
+   * Get customer order history (summaries)
+   */
+  async getCustomerOrders(first = 20): Promise<OrderSummary[]> {
+    const data = await this.executeGraphQL<{
+      customer: {
+        orders: Connection<{
+          entityId: number
+          orderedAt: string
+          status: { value: string; label: string }
+          totalIncTax: { value: number; currencyCode: string }
+        }>
+      } | null
+    }>(QUERIES.GET_CUSTOMER_ORDERS, { first })
+
+    if (!data?.customer?.orders) {
+      return []
+    }
+
+    return this.flattenEdges(data.customer.orders).map((order) => ({
+      entityId: order.entityId,
+      orderedAt: order.orderedAt,
+      status: order.status.label,
+      total: order.totalIncTax,
+      itemCount: 0, // Would need line items to calculate
+    }))
+  }
+
+  /**
+   * Get detailed information for a specific order
+   */
+  async getOrderDetails(orderId: number): Promise<Order | null> {
+    const data = await this.executeGraphQL<{
+      customer: {
+        orders: Connection<Order>
+      } | null
+    }>(QUERIES.GET_ORDER_DETAILS, {
+      filter: { entityId: orderId },
+    })
+
+    if (!data?.customer?.orders) {
+      return null
+    }
+
+    const orders = this.flattenEdges(data.customer.orders)
+    return orders[0] || null
+  }
+
+  /**
+   * Get customer wishlists
+   */
+  async getCustomerWishlists(): Promise<Wishlist[]> {
+    const data = await this.executeGraphQL<{
+      customer: {
+        wishlists: Connection<{
+          entityId: number
+          name: string
+          isPublic: boolean
+          token: string
+          items: Connection<WishlistItem>
+        }>
+      } | null
+    }>(QUERIES.GET_CUSTOMER_WISHLISTS)
+
+    if (!data?.customer?.wishlists) {
+      return []
+    }
+
+    return this.flattenEdges(data.customer.wishlists).map((wl) => ({
+      ...wl,
+      items: this.flattenEdges(wl.items),
+    }))
+  }
+
+  /**
+   * Add items to a wishlist
+   */
+  async addToWishlist(
+    wishlistEntityId: number,
+    items: Array<{ productEntityId: number; variantEntityId?: number }>
+  ): Promise<Wishlist | null> {
+    const data = await this.executeGraphQL<{
+      wishlist: {
+        addWishlistItems: {
+          result: {
+            entityId: number
+            name: string
+            items: Connection<{ entityId: number; productEntityId: number; variantEntityId?: number }>
+          } | null
+          errors: Array<{ message: string }>
+        }
+      }
+    }>(MUTATIONS.ADD_WISHLIST_ITEMS, {
+      input: { entityId: wishlistEntityId, items },
+    })
+
+    const result = data?.wishlist?.addWishlistItems
+    if (result?.errors?.length > 0) {
+      throw new Error(result.errors.map((e) => e.message).join(', '))
+    }
+
+    if (!result?.result) {
+      return null
+    }
+
+    return {
+      entityId: result.result.entityId,
+      name: result.result.name,
+      isPublic: false,
+      items: this.flattenEdges(result.result.items).map((item) => ({
+        entityId: item.entityId,
+        productEntityId: item.productEntityId,
+        variantEntityId: item.variantEntityId,
+        product: {
+          entityId: item.productEntityId,
+          name: '',
+          path: '',
+        },
+      })),
+    }
+  }
+
+  /**
+   * Remove items from a wishlist
+   */
+  async removeFromWishlist(
+    wishlistEntityId: number,
+    itemEntityIds: number[]
+  ): Promise<Wishlist | null> {
+    const data = await this.executeGraphQL<{
+      wishlist: {
+        deleteWishlistItems: {
+          result: {
+            entityId: number
+            name: string
+          } | null
+          errors: Array<{ message: string }>
+        }
+      }
+    }>(MUTATIONS.DELETE_WISHLIST_ITEMS, {
+      input: { entityId: wishlistEntityId, itemEntityIds },
+    })
+
+    const result = data?.wishlist?.deleteWishlistItems
+    if (result?.errors?.length > 0) {
+      throw new Error(result.errors.map((e) => e.message).join(', '))
+    }
+
+    if (!result?.result) {
+      return null
+    }
+
+    return {
+      entityId: result.result.entityId,
+      name: result.result.name,
+      isPublic: false,
+      items: [],
     }
   }
 }

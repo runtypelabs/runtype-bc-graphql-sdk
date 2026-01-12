@@ -156,6 +156,167 @@ export const CREATE_CART_REDIRECT_URLS = `
   }
 `
 
+// ---------------------------------------------------------------------------
+// Customer Mutations
+// ---------------------------------------------------------------------------
+
+export const UPDATE_CUSTOMER = `
+  mutation UpdateCustomer($input: UpdateCustomerInput!) {
+    customer {
+      updateCustomer(input: $input) {
+        customer {
+          entityId
+          email
+          firstName
+          lastName
+          phone
+          company
+        }
+        errors {
+          ... on ValidationError {
+            message
+            path
+          }
+          ... on CustomerNotLoggedInError {
+            message
+          }
+        }
+      }
+    }
+  }
+`
+
+export const ADD_CUSTOMER_ADDRESS = `
+  mutation AddCustomerAddress($input: AddCustomerAddressInput!) {
+    customer {
+      addCustomerAddress(input: $input) {
+        address {
+          entityId
+          firstName
+          lastName
+          address1
+          address2
+          city
+          company
+          countryCode
+          stateOrProvince
+          phone
+          postalCode
+        }
+        errors {
+          ... on ValidationError {
+            message
+            path
+          }
+          ... on CustomerNotLoggedInError {
+            message
+          }
+          ... on CustomerAddressCreationError {
+            message
+          }
+        }
+      }
+    }
+  }
+`
+
+export const UPDATE_CUSTOMER_ADDRESS = `
+  mutation UpdateCustomerAddress($input: UpdateCustomerAddressInput!) {
+    customer {
+      updateCustomerAddress(input: $input) {
+        address {
+          entityId
+          firstName
+          lastName
+          address1
+          address2
+          city
+          company
+          countryCode
+          stateOrProvince
+          phone
+          postalCode
+        }
+        errors {
+          ... on ValidationError {
+            message
+            path
+          }
+          ... on CustomerNotLoggedInError {
+            message
+          }
+          ... on CustomerAddressUpdateError {
+            message
+          }
+        }
+      }
+    }
+  }
+`
+
+export const DELETE_CUSTOMER_ADDRESS = `
+  mutation DeleteCustomerAddress($input: DeleteCustomerAddressInput!) {
+    customer {
+      deleteCustomerAddress(input: $input) {
+        deletedAddressEntityId
+        errors {
+          ... on CustomerNotLoggedInError {
+            message
+          }
+          ... on CustomerAddressDeletionError {
+            message
+          }
+        }
+      }
+    }
+  }
+`
+
+export const ADD_WISHLIST_ITEMS = `
+  mutation AddWishlistItems($input: AddWishlistItemsInput!) {
+    wishlist {
+      addWishlistItems(input: $input) {
+        result {
+          entityId
+          name
+          items(first: 50) {
+            edges {
+              node {
+                entityId
+                productEntityId
+                variantEntityId
+              }
+            }
+          }
+        }
+        errors {
+          ... on CustomerNotLoggedInError {
+            message
+          }
+        }
+      }
+    }
+  }
+`
+
+export const DELETE_WISHLIST_ITEMS = `
+  mutation DeleteWishlistItems($input: DeleteWishlistItemsInput!) {
+    wishlist {
+      deleteWishlistItems(input: $input) {
+        result {
+          entityId
+          name
+        }
+        errors {
+          ... on CustomerNotLoggedInError {
+            message
+          }
+        }
+      }
+    }
+  }
+`
+
 export const MUTATIONS = {
   CREATE_CART,
   ADD_CART_LINE_ITEMS,
@@ -163,4 +324,10 @@ export const MUTATIONS = {
   DELETE_CART_LINE_ITEM,
   DELETE_CART,
   CREATE_CART_REDIRECT_URLS,
+  UPDATE_CUSTOMER,
+  ADD_CUSTOMER_ADDRESS,
+  UPDATE_CUSTOMER_ADDRESS,
+  DELETE_CUSTOMER_ADDRESS,
+  ADD_WISHLIST_ITEMS,
+  DELETE_WISHLIST_ITEMS,
 }

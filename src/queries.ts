@@ -742,6 +742,244 @@ export const GET_STORE_SETTINGS = `
   }
 `
 
+// ---------------------------------------------------------------------------
+// Customer Queries
+// ---------------------------------------------------------------------------
+
+export const GET_CUSTOMER = `
+  query GetCustomer {
+    customer {
+      entityId
+      email
+      firstName
+      lastName
+      phone
+      company
+      customerGroupId
+      customerGroupName
+      addressCount
+      storeCredit {
+        value
+        currencyCode
+      }
+      isSubscribedToNewsletter
+    }
+  }
+`
+
+export const GET_CUSTOMER_ADDRESSES = `
+  query GetCustomerAddresses($first: Int = 50, $after: String) {
+    customer {
+      entityId
+      addresses(first: $first, after: $after) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        edges {
+          node {
+            entityId
+            firstName
+            lastName
+            address1
+            address2
+            city
+            company
+            countryCode
+            stateOrProvince
+            phone
+            postalCode
+          }
+        }
+      }
+    }
+  }
+`
+
+export const GET_CUSTOMER_ORDERS = `
+  query GetCustomerOrders($first: Int = 20, $after: String) {
+    customer {
+      entityId
+      orders(first: $first, after: $after) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        edges {
+          node {
+            entityId
+            orderedAt
+            updatedAt
+            status {
+              value
+              label
+            }
+            totalIncTax {
+              value
+              currencyCode
+            }
+          }
+        }
+      }
+    }
+  }
+`
+
+export const GET_ORDER_DETAILS = `
+  query GetOrderDetails($filter: OrderFilterInput) {
+    customer {
+      orders(first: 1, filter: $filter) {
+        edges {
+          node {
+            entityId
+            orderedAt
+            updatedAt
+            status {
+              value
+              label
+            }
+            billingAddress {
+              firstName
+              lastName
+              email
+              company
+              address1
+              address2
+              city
+              stateOrProvince
+              postalCode
+              countryCode
+              phone
+            }
+            consignments {
+              shipping {
+                edges {
+                  node {
+                    entityId
+                    status
+                    shippingAddress {
+                      firstName
+                      lastName
+                      email
+                      company
+                      address1
+                      address2
+                      city
+                      stateOrProvince
+                      postalCode
+                      countryCode
+                      phone
+                    }
+                    shippingCost {
+                      value
+                      currencyCode
+                    }
+                    handlingCost {
+                      value
+                      currencyCode
+                    }
+                    lineItems {
+                      edges {
+                        node {
+                          entityId
+                          productEntityId
+                          variantEntityId
+                          name
+                          sku
+                          quantity
+                          subTotalListPrice {
+                            value
+                            currencyCode
+                          }
+                          subTotalSalePrice {
+                            value
+                            currencyCode
+                          }
+                          imageUrl
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            subTotal {
+              value
+              currencyCode
+            }
+            shippingCostTotal {
+              value
+              currencyCode
+            }
+            taxTotal {
+              value
+              currencyCode
+            }
+            totalIncTax {
+              value
+              currencyCode
+            }
+            customerMessage
+            discounts {
+              couponCode
+              discountedAmount {
+                value
+                currencyCode
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`
+
+export const GET_CUSTOMER_WISHLISTS = `
+  query GetCustomerWishlists($first: Int = 10) {
+    customer {
+      entityId
+      wishlists(first: $first) {
+        edges {
+          node {
+            entityId
+            name
+            isPublic
+            token
+            items(first: 50) {
+              edges {
+                node {
+                  entityId
+                  productEntityId
+                  variantEntityId
+                  product {
+                    entityId
+                    name
+                    path
+                    prices {
+                      price {
+                        value
+                        currencyCode
+                      }
+                      salePrice {
+                        value
+                        currencyCode
+                      }
+                    }
+                    defaultImage {
+                      url(width: 200)
+                      altText
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`
+
 export const QUERIES = {
   SEARCH_PRODUCTS,
   GET_PRODUCT_BY_ID,
@@ -750,4 +988,9 @@ export const QUERIES = {
   GET_CART,
   GET_CATEGORY_TREE,
   GET_STORE_SETTINGS,
+  GET_CUSTOMER,
+  GET_CUSTOMER_ADDRESSES,
+  GET_CUSTOMER_ORDERS,
+  GET_ORDER_DETAILS,
+  GET_CUSTOMER_WISHLISTS,
 }

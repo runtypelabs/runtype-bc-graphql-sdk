@@ -23,15 +23,42 @@ npm test             # Run unit tests (Vitest)
 npm run test:watch   # Run tests in watch mode
 npm run test:e2e     # Run Playwright browser e2e tests (headless)
 npm run test:e2e:ui  # Run e2e tests with Playwright UI
-npm run test:browser # Start interactive browser test server at localhost:3000
+npm run test:browser # Start interactive browser test server at https://localhost:3000
+npm run generate-certs # Generate SSL certificates (required before first run)
+```
+
+### Test Server Setup
+
+The test server uses HTTPS with self-signed certificates:
+
+```bash
+# First time setup - generate SSL certificates
+npm run generate-certs
+
+# Start interactive browser test server
+npm run test:browser
+# Opens https://localhost:3000 (accept the self-signed certificate warning)
 ```
 
 ### E2E Test Configuration
 
 E2E tests use Playwright with Chromium and run against a real BigCommerce store:
-- Endpoint: `https://store-dvzxci70mm-1.mybigcommerce.com/graphql`
-- CORS configured for `http://localhost:3000`
-- Tests cover: SDK loading, product search, cart operations, checkout URLs
+- Endpoint: `https://store-dvzxci70mm.mybigcommerce.com/graphql`
+- CORS configured for both `http://localhost:3000` and `https://localhost:3000`
+- Test customer account: `test@test.test` / `Abc12345`
+
+### E2E Test Coverage
+
+Tests cover:
+- SDK loading and initialization
+- Product search and filtering
+- Product details and configuration
+- Cart operations (add, update, remove, delete)
+- Checkout URL generation
+- Customer account (unauthenticated behavior)
+- Customer account (authenticated): profile, addresses, orders, wishlists
+
+Note: Some tests may be skipped based on store configuration (e.g., reCAPTCHA requirements for address creation).
 
 ## Releasing
 
@@ -89,7 +116,8 @@ test/
 │   └── sdk.spec.ts  # Playwright e2e tests
 ├── browser/
 │   └── index.html   # Interactive browser test page
-└── server.mjs       # Test server for localhost:3000
+├── certs/           # SSL certificates (gitignored, generated via npm run generate-certs)
+└── server.mjs       # HTTPS test server for localhost:3000
 ```
 
 ## Build Outputs
@@ -109,22 +137,38 @@ dist/
 
 ```
 BigCommerceAgentSDK
-├── searchProducts(params)
-├── getProductById(id, variantId?)
-├── getProductByPath(path)
-├── getConfiguredProduct(id, selectedOptions)
-├── findVariantByOptions(productId, options)
-├── getCart()
-├── addToCart(items)
-├── quickAddToCart(productId, qty, options)
-├── updateCartItem(lineItemId, qty)
-├── removeFromCart(lineItemId)
-├── deleteCart()
-├── getCheckoutUrls()
-├── proceedToCheckout(embedded?)
-├── getCategoryTree(depth?)
-├── getCartSummary()
-└── getStoreSettings()
+├── Products
+│   ├── searchProducts(params)
+│   ├── getProductById(id, variantId?)
+│   ├── getProductByPath(path)
+│   ├── getConfiguredProduct(id, selectedOptions)
+│   └── findVariantByOptions(productId, options)
+├── Cart
+│   ├── getCart()
+│   ├── addToCart(items)
+│   ├── quickAddToCart(productId, qty, options)
+│   ├── updateCartItem(lineItemId, qty)
+│   ├── removeFromCart(lineItemId)
+│   ├── deleteCart()
+│   ├── getCheckoutUrls()
+│   ├── proceedToCheckout(embedded?)
+│   └── getCartSummary()
+├── Store
+│   ├── getCategoryTree(depth?)
+│   └── getStoreSettings()
+└── Customer Account (requires authenticated session)
+    ├── isLoggedIn()
+    ├── getCustomer()
+    ├── updateCustomer(input)
+    ├── getCustomerAddresses()
+    ├── addCustomerAddress(input)
+    ├── updateCustomerAddress(addressEntityId, input)
+    ├── deleteCustomerAddress(addressEntityId)
+    ├── getCustomerOrders(first?)
+    ├── getOrderDetails(orderId)
+    ├── getCustomerWishlists()
+    ├── addToWishlist(wishlistEntityId, items)
+    └── removeFromWishlist(wishlistEntityId, itemEntityIds)
 ```
 
 ## Runtype Integration

@@ -32,3 +32,10 @@ coverage/
 *.tmp
 *.temp
 .cache/
+
+# Test SSL certificates
+test/certs/
+
+# Playwright
+test-results/
+playwright-report/
