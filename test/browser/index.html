@@ -94,9 +94,14 @@
 
   <div class="controls">
     <button id="runTests">Run All Tests</button>
+    <button id="loginToStore">Login to Store</button>
+    <button id="logoutFromStore">Logout</button>
     <button id="goToCheckout" disabled>Go to Checkout</button>
     <button id="runCleanup">Run Cleanup</button>
     <button id="clearCart">Clear Cart</button>
+  </div>
+  <div id="loginStatus" style="margin-bottom: 10px; padding: 10px; background: #e9ecef; border-radius: 4px;">
+    Login Status: <span id="loginStatusText">Checking...</span>
   </div>
 
   <div class="summary">
@@ -119,13 +124,25 @@
       debug: true
     };
 
+    // Store URL and test credentials
+    const STORE_URL = 'https://store-dvzxci70mm.mybigcommerce.com';
+    const TEST_CUSTOMER = {
+      email: 'test@test.test',
+      password: 'Abc12345'
+    };
+
     // Test state
     let sdk;
     let testState = {
       searchedProduct: null,
       productWithOptions: null,
       cartId: null,
-      checkoutUrl: null
+      checkoutUrl: null,
+      isLoggedIn: false,
+      customer: null,
+      testAddressId: null,
+      testWishlistId: null,
+      testWishlistItemId: null
     };
 
     // Test runner
@@ -497,6 +514,266 @@
       }
     ]);
 
+    runner.suite('Customer Account - Auth Check', [
+      {
+        name: 'Check login status (isLoggedIn)',
+        fn: async () => {
+          const customer = await sdk.isLoggedIn();
+          testState.isLoggedIn = !!customer;
+          testState.customer = customer;
+
+          // Update UI
+          const statusEl = document.getElementById('loginStatusText');
+          if (customer) {
+            statusEl.textContent = `Logged in as ${customer.email}`;
+            statusEl.style.color = '#155724';
+          } else {
+            statusEl.textContent = 'Not logged in';
+            statusEl.style.color = '#721c24';
+          }
+
+          return customer ? {
+            isLoggedIn: true,
+            email: customer.email,
+            name: `${customer.firstName} ${customer.lastName}`
+          } : {
+            isLoggedIn: false,
+            message: 'Not logged in - click "Login to Store" to test authenticated features'
+          };
+        }
+      }
+    ]);
+
+    runner.suite('Customer Account - Profile', [
+      {
+        name: 'Get customer profile (getCustomer)',
+        fn: async () => {
+          const customer = await sdk.getCustomer();
+          if (!customer) {
+            return { skipped: true, message: 'Not logged in' };
+          }
+          return {
+            entityId: customer.entityId,
+            email: customer.email,
+            firstName: customer.firstName,
+            lastName: customer.lastName,
+            phone: customer.phone,
+            company: customer.company,
+            addressCount: customer.addressCount,
+            storeCredit: customer.storeCredit
+          };
+        }
+      }
+    ]);
+
+    runner.suite('Customer Account - Addresses', [
+      {
+        name: 'Get customer addresses',
+        fn: async () => {
+          if (!testState.isLoggedIn) {
+            return { skipped: true, message: 'Not logged in' };
+          }
+          const addresses = await sdk.getCustomerAddresses();
+          return {
+            count: addresses.length,
+            addresses: addresses.map(a => ({
+              id: a.entityId,
+              address: `${a.address1}, ${a.city}, ${a.stateOrProvince} ${a.postalCode}`
+            }))
+          };
+        }
+      },
+      {
+        name: 'Add customer address',
+        fn: async () => {
+          if (!testState.isLoggedIn) {
+            return { skipped: true, message: 'Not logged in' };
+          }
+          try {
+            const address = await sdk.addCustomerAddress({
+              firstName: 'Test',
+              lastName: 'Address',
+              address1: '123 Test Street',
+              city: 'Austin',
+              stateOrProvince: 'Texas',
+              postalCode: '78701',
+              countryCode: 'US',
+              phone: '555-1234'
+            });
+            testState.testAddressId = address.entityId;
+            return {
+              created: true,
+              addressId: address.entityId,
+              address: `${address.address1}, ${address.city}`
+            };
+          } catch (e) {
+            if (e.message.toLowerCase().includes('recaptcha')) {
+              return { skipped: true, message: 'Store requires reCAPTCHA for address creation' };
+            }
+            throw e;
+          }
+        }
+      },
+      {
+        name: 'Update customer address',
+        fn: async () => {
+          if (!testState.testAddressId) {
+            return { skipped: true, message: 'No test address created' };
+          }
+          const updated = await sdk.updateCustomerAddress(testState.testAddressId, {
+            address1: '456 Updated Street'
+          });
+          return {
+            updated: true,
+            addressId: updated.entityId,
+            newAddress: updated.address1
+          };
+        }
+      },
+      {
+        name: 'Delete customer address',
+        fn: async () => {
+          if (!testState.testAddressId) {
+            return { skipped: true, message: 'No test address to delete' };
+          }
+          const deletedId = await sdk.deleteCustomerAddress(testState.testAddressId);
+          testState.testAddressId = null;
+          return {
+            deleted: true,
+            deletedAddressId: deletedId
+          };
+        }
+      }
+    ]);
+
+    runner.suite('Customer Account - Orders', [
+      {
+        name: 'Get customer orders',
+        fn: async () => {
+          if (!testState.isLoggedIn) {
+            return { skipped: true, message: 'Not logged in' };
+          }
+          try {
+            const orders = await sdk.getCustomerOrders(5);
+            return {
+              count: orders.length,
+              orders: orders.map(o => ({
+                id: o.entityId,
+                date: o.orderedAt,
+                status: o.status,
+                total: o.total
+              }))
+            };
+          } catch (e) {
+            return { error: e.message, note: 'Orders API may not be available' };
+          }
+        }
+      },
+      {
+        name: 'Get order details (if orders exist)',
+        fn: async () => {
+          if (!testState.isLoggedIn) {
+            return { skipped: true, message: 'Not logged in' };
+          }
+          try {
+            const orders = await sdk.getCustomerOrders(1);
+            if (orders.length === 0) {
+              return { skipped: true, message: 'No orders found' };
+            }
+            const details = await sdk.getOrderDetails(orders[0].entityId);
+            return {
+              orderId: details?.entityId,
+              status: details?.status,
+              itemCount: details?.consignments?.shipping?.length || 0
+            };
+          } catch (e) {
+            return { error: e.message, note: 'Order details API may not be available' };
+          }
+        }
+      }
+    ]);
+
+    runner.suite('Customer Account - Wishlists', [
+      {
+        name: 'Get customer wishlists',
+        fn: async () => {
+          if (!testState.isLoggedIn) {
+            return { skipped: true, message: 'Not logged in' };
+          }
+          try {
+            const wishlists = await sdk.getCustomerWishlists();
+            if (wishlists.length > 0) {
+              testState.testWishlistId = wishlists[0].entityId;
+            }
+            return {
+              count: wishlists.length,
+              wishlists: wishlists.map(w => ({
+                id: w.entityId,
+                name: w.name,
+                itemCount: w.items?.length || 0,
+                isPublic: w.isPublic
+              }))
+            };
+          } catch (e) {
+            return { error: e.message, note: 'Wishlists API may not be available' };
+          }
+        }
+      },
+      {
+        name: 'Add product to wishlist',
+        fn: async () => {
+          if (!testState.testWishlistId) {
+            return { skipped: true, message: 'No wishlist available' };
+          }
+          if (!testState.searchedProduct) {
+            return { skipped: true, message: 'No product available to add' };
+          }
+          try {
+            const result = await sdk.addToWishlist(testState.testWishlistId, [{
+              productEntityId: testState.searchedProduct.entityId
+            }]);
+            // Find the item we just added
+            const addedItem = result.items?.find(i =>
+              i.productEntityId === testState.searchedProduct.entityId
+            );
+            if (addedItem) {
+              testState.testWishlistItemId = addedItem.entityId;
+            }
+            return {
+              wishlistId: result.entityId,
+              wishlistName: result.name,
+              itemCount: result.items?.length || 0,
+              addedItemId: testState.testWishlistItemId
+            };
+          } catch (e) {
+            return { error: e.message };
+          }
+        }
+      },
+      {
+        name: 'Remove product from wishlist',
+        fn: async () => {
+          if (!testState.testWishlistId || !testState.testWishlistItemId) {
+            return { skipped: true, message: 'No wishlist item to remove' };
+          }
+          try {
+            const result = await sdk.removeFromWishlist(
+              testState.testWishlistId,
+              [testState.testWishlistItemId]
+            );
+            testState.testWishlistItemId = null;
+            return {
+              removed: true,
+              wishlistId: result.entityId,
+              wishlistName: result.name
+            };
+          } catch (e) {
+            return { error: e.message };
+          }
+        }
+      }
+    ]);
+
     // Event handlers
     document.getElementById('runTests').addEventListener('click', async () => {
       document.getElementById('runTests').disabled = true;
@@ -602,6 +879,70 @@
         alert('Cart cleared!');
       } catch (e) {
         alert('No cart to clear or error: ' + e.message);
+      }
+    });
+
+    document.getElementById('loginToStore').addEventListener('click', async () => {
+      if (!sdk) {
+        sdk = new BCAgentSDK.BigCommerceAgentSDK(CONFIG);
+      }
+      const statusEl = document.getElementById('loginStatusText');
+      statusEl.textContent = 'Logging in...';
+      statusEl.style.color = '#856404';
+
+      try {
+        const result = await sdk.login(TEST_CUSTOMER.email, TEST_CUSTOMER.password);
+        if (result && result.customer) {
+          testState.isLoggedIn = true;
+          testState.customer = result.customer;
+          statusEl.textContent = `Logged in as ${result.customer.email}`;
+          statusEl.style.color = '#155724';
+        } else {
+          statusEl.textContent = 'Login failed - invalid credentials';
+          statusEl.style.color = '#721c24';
+        }
+      } catch (e) {
+        statusEl.textContent = `Login error: ${e.message}`;
+        statusEl.style.color = '#721c24';
+      }
+    });
+
+    document.getElementById('logoutFromStore').addEventListener('click', async () => {
+      if (!sdk) {
+        sdk = new BCAgentSDK.BigCommerceAgentSDK(CONFIG);
+      }
+      const statusEl = document.getElementById('loginStatusText');
+      statusEl.textContent = 'Logging out...';
+
+      try {
+        await sdk.logout();
+        testState.isLoggedIn = false;
+        testState.customer = null;
+        statusEl.textContent = 'Not logged in - click "Login to Store" to test customer features';
+        statusEl.style.color = '#856404';
+      } catch (e) {
+        statusEl.textContent = `Logout error: ${e.message}`;
+        statusEl.style.color = '#721c24';
+      }
+    });
+
+    // Check login status on page load
+    window.addEventListener('load', async () => {
+      sdk = new BCAgentSDK.BigCommerceAgentSDK(CONFIG);
+      try {
+        const customer = await sdk.isLoggedIn();
+        const statusEl = document.getElementById('loginStatusText');
+        if (customer) {
+          testState.isLoggedIn = true;
+          testState.customer = customer;
+          statusEl.textContent = `Logged in as ${customer.email}`;
+          statusEl.style.color = '#155724';
+        } else {
+          statusEl.textContent = 'Not logged in - click "Login to Store" to test customer features';
+          statusEl.style.color = '#856404';
+        }
+      } catch (e) {
+        document.getElementById('loginStatusText').textContent = 'Error checking login status';
       }
     });
 

@@ -323,26 +323,27 @@ test.describe.serial('BigCommerce Agent SDK', () => {
   })
 })
 
-// Helper to log in customer via storefront
+// Helper to log in customer via SDK
 async function loginCustomer(page: Page): Promise<void> {
-  // Navigate to store login page
-  await page.goto(`${STORE_URL}/login.php`)
+  const result = await page.evaluate(
+    async ({ email, password }) => {
+      const sdk = (window as any).sdk
+      return await sdk.login(email, password)
+    },
+    { email: TEST_CUSTOMER.email, password: TEST_CUSTOMER.password }
+  )
 
-  // Fill in credentials
-  await page.fill('input[name="login_email"]', TEST_CUSTOMER.email)
-  await page.fill('input[name="login_pass"]', TEST_CUSTOMER.password)
-
-  // Submit form
-  await page.click('input[type="submit"][value="Sign in"]')
-
-  // Wait for redirect to account page or home
-  await page.waitForURL(/account\.php|\//, { timeout: 10000 })
+  if (!result || !result.customer) {
+    throw new Error('Login failed')
+  }
 }
 
-// Helper to log out customer
+// Helper to log out customer via SDK
 async function logoutCustomer(page: Page): Promise<void> {
-  await page.goto(`${STORE_URL}/login.php?action=logout`)
-  await page.waitForURL(/\//, { timeout: 5000 })
+  await page.evaluate(async () => {
+    const sdk = (window as any).sdk
+    await sdk.logout()
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -436,11 +437,9 @@ test.describe.serial('Customer Account - Authenticated', () => {
   test.beforeAll(async ({ browser }) => {
     page = await browser.newPage()
 
-    // Log in first
-    await loginCustomer(page)
-
-    // Then navigate back to our test page and init SDK
+    // Init SDK first, then log in via SDK
     await initSDK(page)
+    await loginCustomer(page)
   })
 
   test.afterAll(async () => {

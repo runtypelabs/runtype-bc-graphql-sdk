@@ -258,7 +258,6 @@ export const DELETE_CUSTOMER_ADDRESS = `
   mutation DeleteCustomerAddress($input: DeleteCustomerAddressInput!) {
     customer {
       deleteCustomerAddress(input: $input) {
-        deletedAddressEntityId
         errors {
           ... on CustomerNotLoggedInError {
             message
@@ -317,6 +316,31 @@ export const DELETE_WISHLIST_ITEMS = `
   }
 `
 
+// ---------------------------------------------------------------------------
+// Authentication Mutations
+// ---------------------------------------------------------------------------
+
+export const LOGIN = `
+  mutation Login($email: String!, $password: String!) {
+    login(email: $email, password: $password) {
+      customer {
+        entityId
+        firstName
+        lastName
+        email
+      }
+    }
+  }
+`
+
+export const LOGOUT = `
+  mutation Logout {
+    logout {
+      result
+    }
+  }
+`
+
 export const MUTATIONS = {
   CREATE_CART,
   ADD_CART_LINE_ITEMS,
@@ -330,4 +354,6 @@ export const MUTATIONS = {
   DELETE_CUSTOMER_ADDRESS,
   ADD_WISHLIST_ITEMS,
   DELETE_WISHLIST_ITEMS,
+  LOGIN,
+  LOGOUT,
 }

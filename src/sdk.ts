@@ -434,6 +434,7 @@ export class BigCommerceAgentSDK {
       data: {
         lineItem: {
           productEntityId: lineItem.productEntityId,
+          variantEntityId: lineItem.variantEntityId,
           quantity: Number(quantity),
         },
       },
@@ -675,6 +676,48 @@ export class BigCommerceAgentSDK {
   // ---------------------------------------------------------------------------
 
   /**
+   * Log in a customer using email and password
+   * Sets authentication cookies for subsequent requests
+   */
+  async login(
+    email: string,
+    password: string
+  ): Promise<{ customer: Customer } | null> {
+    const data = await this.executeGraphQL<{
+      login: {
+        customer: {
+          entityId: number
+          firstName: string
+          lastName: string
+          email: string
+        } | null
+      }
+    }>(MUTATIONS.LOGIN, { email, password })
+
+    if (!data?.login?.customer) {
+      return null
+    }
+
+    return {
+      customer: data.login.customer as Customer,
+    }
+  }
+
+  /**
+   * Log out the current customer
+   * Clears authentication cookies
+   */
+  async logout(): Promise<boolean> {
+    const data = await this.executeGraphQL<{
+      logout: {
+        result: string
+      }
+    }>(MUTATIONS.LOGOUT)
+
+    return data?.logout?.result === 'success'
+  }
+
+  /**
    * Check if a customer is currently logged in
    * Returns customer data if logged in, null otherwise
    */
@@ -777,7 +820,7 @@ export class BigCommerceAgentSDK {
         }
       }
     }>(MUTATIONS.UPDATE_CUSTOMER_ADDRESS, {
-      input: { addressEntityId, ...input },
+      input: { addressEntityId, data: input },
     })
 
     const result = data?.customer?.updateCustomerAddress
@@ -795,7 +838,6 @@ export class BigCommerceAgentSDK {
     const data = await this.executeGraphQL<{
       customer: {
         deleteCustomerAddress: {
-          deletedAddressEntityId: number | null
           errors: Array<{ message: string }>
         }
       }
@@ -808,7 +850,8 @@ export class BigCommerceAgentSDK {
       throw new Error(result.errors.map((e) => e.message).join(', '))
     }
 
-    return result?.deletedAddressEntityId || null
+    // Return the addressEntityId to indicate successful deletion
+    return addressEntityId
   }
 
   /**
