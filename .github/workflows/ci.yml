@@ -56,6 +56,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Generate SSL certificates
+        run: npm run generate-certs
+
       - name: Run E2E tests
         run: npx playwright test
 
