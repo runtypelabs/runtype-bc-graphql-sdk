@@ -7,7 +7,14 @@
  */
 
 import type { BigCommerceAgentSDK } from './sdk'
-import type { Product, OptionValueId, SortOrder, UpdateCustomerInput, AddCustomerAddressInput } from './types'
+import type {
+  Product,
+  OptionValueId,
+  SortOrder,
+  UpdateCustomerInput,
+  AddCustomerAddressInput,
+  WebPagesFiltersInput,
+} from './types'
 
 // Tool definition types
 export interface ToolParameterSchema {
@@ -27,6 +34,12 @@ export interface ToolDefinition {
   description: string
   toolType: 'local'
   parametersSchema: ToolParameterSchema
+  /**
+   * Whether the tool only reads data (no mutations / side effects). Drives the
+   * widget's WebMCP `autoApprove` gate: read-only tools run silently, mutating
+   * tools surface a confirmation bubble.
+   */
+  readOnly: boolean
 }
 
 // Tool result types
@@ -771,11 +784,83 @@ Requires the wishlistEntityId and the itemEntityIds (wishlist item IDs, not prod
       required: ['wishlistEntityId', 'itemEntityIds'],
     },
   },
+
+  get_web_pages: {
+    name: 'get_web_pages',
+    description: `List the store's web content pages (policies, FAQs, About, Contact, blog index, etc.). Returns:
+- Page name, type, and path/link
+- A short plain-text summary of each page
+
+Use this FIRST to discover which page answers a policy/shipping/returns/FAQ question, then call get_web_page for the full content.`,
+    toolType: 'local' as const,
+    parametersSchema: {
+      type: 'object',
+      properties: {
+        entityIds: {
+          type: 'array',
+          items: { type: 'number' },
+          description: 'Optional: only return pages with these entity IDs',
+        },
+        pageType: {
+          type: 'string',
+          enum: ['NormalPage', 'ContactPage', 'ExternalLinkPage', 'BlogIndexPage', 'RawPage'],
+          description: 'Optional: filter by page type',
+        },
+      },
+    },
+  },
+
+  get_web_page: {
+    name: 'get_web_page',
+    description: `Get the full content of a single web content page by its entity ID. Returns the page name, path, plain-text summary, and full HTML body.
+
+Use this after get_web_pages to read a page's content so you can answer policy/shipping/returns/FAQ questions directly without sending the customer away.`,
+    toolType: 'local' as const,
+    parametersSchema: {
+      type: 'object',
+      properties: {
+        entityId: {
+          type: 'number',
+          description: 'The web page entity ID to retrieve (from get_web_pages)',
+        },
+      },
+      required: ['entityId'],
+    },
+  },
 } as const
 
-// Helper to get all tool definitions as array
+/**
+ * Names of the read-only tools (no mutations / side effects). The widget's
+ * WebMCP `autoApprove` gate uses this set: read-only tools run silently while
+ * everything else surfaces a confirmation bubble. Keep in sync with the
+ * `readOnly` flags applied in {@link getAllToolDefinitions}.
+ */
+export const READ_ONLY_TOOL_NAMES = [
+  'search_products',
+  'get_product_details',
+  'get_product_by_url',
+  'configure_product',
+  'get_cart',
+  'get_categories',
+  'get_store_info',
+  'check_login_status',
+  'get_customer_profile',
+  'get_customer_addresses',
+  'get_order_history',
+  'get_order_details',
+  'get_wishlists',
+  'get_web_pages',
+  'get_web_page',
+] as const
+
+const READ_ONLY_TOOL_SET = new Set<string>(READ_ONLY_TOOL_NAMES)
+
+// Helper to get all tool definitions as array, with read-only flags applied
 export function getAllToolDefinitions(): ToolDefinition[] {
-  return Object.values(BigCommerceLocalTools) as ToolDefinition[]
+  return Object.values(BigCommerceLocalTools).map((tool) => ({
+    ...tool,
+    readOnly: READ_ONLY_TOOL_SET.has(tool.name),
+  })) as ToolDefinition[]
 }
 
 // Tool argument types
@@ -1681,6 +1766,69 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           success: false,
           error: (error as Error).message,
           errorType: 'REMOVE_WISHLIST_ERROR',
+        }
+      }
+    },
+
+    async get_web_pages(args: WebPagesFiltersInput = {}): Promise<ToolResult> {
+      try {
+        const pages = await sdk.getWebPages({
+          entityIds: args.entityIds,
+          pageType: args.pageType,
+        })
+
+        return {
+          success: true,
+          data: {
+            pageCount: pages.length,
+            pages: pages.map((page) => ({
+              id: page.entityId,
+              name: page.name,
+              type: page.type,
+              path: page.path,
+              link: page.link,
+              summary: page.plainTextSummary,
+            })),
+          },
+        }
+      } catch (error) {
+        return {
+          success: false,
+          error: (error as Error).message,
+          errorType: 'WEB_PAGES_ERROR',
+        }
+      }
+    },
+
+    async get_web_page(args: { entityId: number }): Promise<ToolResult> {
+      try {
+        const page = await sdk.getWebPage(args.entityId)
+
+        if (!page) {
+          return {
+            success: false,
+            error: `Web page with ID ${args.entityId} not found`,
+            errorType: 'NOT_FOUND',
+          }
+        }
+
+        return {
+          success: true,
+          data: {
+            id: page.entityId,
+            name: page.name,
+            type: page.type,
+            path: page.path,
+            summary: page.plainTextSummary,
+            htmlBody: page.htmlBody,
+            parentId: page.parentEntityId,
+          },
+        }
+      } catch (error) {
+        return {
+          success: false,
+          error: (error as Error).message,
+          errorType: 'WEB_PAGE_ERROR',
         }
       }
     },

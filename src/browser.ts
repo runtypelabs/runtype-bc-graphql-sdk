@@ -6,6 +6,7 @@
 import { BigCommerceAgentSDK } from './sdk'
 import { QUERIES } from './queries'
 import { MUTATIONS } from './mutations'
+import { registerWebMCPTools } from './webmcp'
 
 declare global {
   interface Window {
@@ -34,6 +35,16 @@ sdk.MUTATIONS = MUTATIONS
 if (typeof window !== 'undefined') {
   window.BCAgentSDK = sdk
   window.BigCommerceAgentSDK = BigCommerceAgentSDK
+
+  // Register the SDK's commerce capabilities as WebMCP tools on
+  // document.modelContext so a WebMCP-aware chat widget can discover and call
+  // them. Installs the polyfill at load so the registry exists before the
+  // widget's first dispatch. Guarded so failure never breaks the SDK.
+  try {
+    registerWebMCPTools(sdk)
+  } catch (error) {
+    console.warn('[BCAgentSDK] Failed to register WebMCP tools:', error)
+  }
 
   // Fire ready event
   const event = new CustomEvent('bcagentsdk:ready', { detail: { sdk } })

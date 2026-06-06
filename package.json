@@ -64,6 +64,9 @@
     "url": "https://github.com/runtypelabs/runtype-bc-graphql-sdk/issues"
   },
   "homepage": "https://github.com/runtypelabs/runtype-bc-graphql-sdk#readme",
+  "dependencies": {
+    "@mcp-b/webmcp-polyfill": "3.0.0"
+  },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
     "@types/node": "^20.10.0",
