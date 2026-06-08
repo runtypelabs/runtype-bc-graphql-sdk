@@ -841,6 +841,7 @@ export const READ_ONLY_TOOL_NAMES = [
   'get_product_by_url',
   'configure_product',
   'get_cart',
+  'proceed_to_checkout',
   'get_categories',
   'get_store_info',
   'check_login_status',
