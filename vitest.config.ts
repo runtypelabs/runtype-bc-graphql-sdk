@@ -7,6 +7,5 @@ export default defineConfig({
       '**/dist/**',
       '**/test/e2e/**',
     ],
-    passWithNoTests: true,
   },
 })
