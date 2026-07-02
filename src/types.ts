@@ -34,6 +34,7 @@ export interface Brand {
   entityId: number
   name: string
   path?: string
+  defaultImage?: Image
 }
 
 export interface Category {

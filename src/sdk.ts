@@ -12,6 +12,7 @@ import {
   CartSummary,
   CartLineItemInput,
   CheckoutUrls,
+  Brand,
   Category,
   StoreSettings,
   Currency,
@@ -556,6 +557,14 @@ export class BigCommerceAgentSDK {
     }>(QUERIES.GET_CATEGORY_TREE, { depth })
 
     return data?.site?.categoryTree || []
+  }
+
+  async getBrands(first = 50): Promise<Brand[]> {
+    const data = await this.executeGraphQL<{
+      site: { brands: Connection<Brand> }
+    }>(QUERIES.GET_BRANDS, { first })
+
+    return data?.site?.brands ? this.flattenEdges(data.site.brands) : []
   }
 
   async getStoreSettings(): Promise<{ settings: StoreSettings | null; currencies: Currency[] }> {

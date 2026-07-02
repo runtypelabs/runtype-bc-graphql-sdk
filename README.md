@@ -11,7 +11,7 @@ A zero-dependency TypeScript SDK that lets AI agents shop a BigCommerce storefro
 - **Zero runtime dependencies** — built on the native Fetch API (the only dependency, a WebMCP polyfill, is used exclusively by the browser bundle)
 - **Full storefront coverage** — product search with faceted filters, product configuration/variants, cart CRUD, checkout URLs, categories, store settings, CMS web pages
 - **Customer account support** — profile, addresses, order history, and wishlists when a customer session exists
-- **Agent-native** — 27 typed tool definitions with JSON Schema parameters, structured error responses, and a read-only/mutating classification for approval gating
+- **Agent-native** — 28 typed tool definitions with JSON Schema parameters, structured error responses, and a read-only/mutating classification for approval gating
 - **WebMCP integration** — the browser bundle registers tools on `document.modelContext` automatically (see [WebMCP tool registration](#webmcp-tool-registration))
 - **Cart persistence** — cart ID stored in `localStorage`, requests sent with `credentials: 'include'` so cart sessions survive across pages
 - **Clean responses** — GraphQL connection/edge boilerplate is flattened into plain arrays
@@ -125,7 +125,7 @@ Each tool definition carries a `readOnly` flag, derived from `READ_ONLY_TOOL_NAM
 
 | Read-only (auto-approvable) | Mutating (confirm before running) |
 | --- | --- |
-| `search_products`, `get_product_details`, `get_product_by_url`, `configure_product`, `get_cart`, `proceed_to_checkout`, `get_categories`, `get_store_info`, `check_login_status`, `get_customer_profile`, `get_customer_addresses`, `get_order_history`, `get_order_details`, `get_wishlists`, `get_web_pages`, `get_web_page` | `add_to_cart`, `quick_add_to_cart`, `update_cart_item`, `remove_from_cart`, `clear_cart`, `update_customer_profile`, `add_customer_address`, `update_customer_address`, `delete_customer_address`, `add_to_wishlist`, `remove_from_wishlist` |
+| `search_products`, `get_product_details`, `get_product_by_url`, `configure_product`, `get_cart`, `proceed_to_checkout`, `get_categories`, `get_brands`, `get_store_info`, `check_login_status`, `get_customer_profile`, `get_customer_addresses`, `get_order_history`, `get_order_details`, `get_wishlists`, `get_web_pages`, `get_web_page` | `add_to_cart`, `quick_add_to_cart`, `update_cart_item`, `remove_from_cart`, `clear_cart`, `update_customer_profile`, `add_customer_address`, `update_customer_address`, `delete_customer_address`, `add_to_wishlist`, `remove_from_wishlist` |
 
 Note that `proceed_to_checkout` is classified read-only by design: it is a *navigation* tool (it resolves and redirects to the checkout URL) and mutates nothing — the shopper still confirms everything on the checkout page itself.
 
@@ -175,6 +175,7 @@ All methods return Promises. Connection/edge responses are flattened into plain 
 | Method | Description |
 | --- | --- |
 | `getCategoryTree(depth?)` | Category hierarchy |
+| `getBrands(first?)` | Product brands with IDs, paths, and logos |
 | `getStoreSettings()` | Store name, URLs, currencies, and settings |
 | `getWebPages(filters?)` | CMS web pages (contact, content pages, links) |
 | `getWebPage(entityId)` | A single web page with content |

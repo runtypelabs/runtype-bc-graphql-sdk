@@ -207,6 +207,12 @@ await sdk.proceedToCheckout(true) // embedded checkout
 const categories = await sdk.getCategoryTree(3)
 ```
 
+#### `getBrands(first?)`
+
+```javascript
+const brands = await sdk.getBrands(50) // [{ entityId, name, path, defaultImage }]
+```
+
 #### `getStoreSettings()`
 
 ```javascript
@@ -605,7 +611,7 @@ async function showAccountSummary() {
 
 ## Agent Integration Guide
 
-Don't hand-roll tool wrappers — the `tools` entry point ships 27 ready-made definitions (name, description, JSON Schema parameters) and implementations that return structured errors instead of throwing:
+Don't hand-roll tool wrappers — the `tools` entry point ships 28 ready-made definitions (name, description, JSON Schema parameters) and implementations that return structured errors instead of throwing:
 
 ```javascript
 import { BigCommerceAgentSDK } from '@runtypelabs/runtype-bc-graphql-sdk'

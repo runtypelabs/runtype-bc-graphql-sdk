@@ -155,6 +155,7 @@ BigCommerceAgentSDK
 │   └── getCartSummary()
 ├── Store
 │   ├── getCategoryTree(depth?)
+│   ├── getBrands(first?)
 │   └── getStoreSettings()
 └── Customer Account (requires authenticated session)
     ├── isLoggedIn()

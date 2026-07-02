@@ -137,6 +137,36 @@ describe('searchProducts', () => {
   })
 })
 
+describe('getBrands', () => {
+  it('flattens brand connection edges', async () => {
+    fetchMock.mockResolvedValueOnce(
+      gqlResponse({
+        site: {
+          brands: {
+            edges: [
+              { node: { entityId: 1, name: 'Acme', path: '/acme/' } },
+              { node: { entityId: 2, name: 'Zenith', path: '/zenith/' } },
+            ],
+          },
+        },
+      })
+    )
+    const sdk = new BigCommerceAgentSDK()
+
+    const brands = await sdk.getBrands()
+
+    expect(brands.map((b) => b.name)).toEqual(['Acme', 'Zenith'])
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).variables.first).toBe(50)
+  })
+
+  it('returns an empty list when the API returns no brands', async () => {
+    fetchMock.mockResolvedValueOnce(gqlResponse({}))
+    const sdk = new BigCommerceAgentSDK()
+
+    await expect(sdk.getBrands()).resolves.toEqual([])
+  })
+})
+
 describe('cart persistence', () => {
   it('persists the cart ID from a fetched cart', async () => {
     fetchMock.mockResolvedValueOnce(gqlResponse({ site: { cart: { entityId: 'cart-1' } } }))
