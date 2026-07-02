@@ -32,8 +32,8 @@
     "test:e2e": "npm run build && npx playwright test",
     "test:e2e:ui": "npm run build && npx playwright test --ui",
     "generate-certs": "mkdir -p test/certs && openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout test/certs/localhost.key -out test/certs/localhost.crt -subj '/CN=localhost'",
-    "lint": "eslint src --ext .ts,.tsx",
-    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
     "typecheck": "tsc --noEmit",
     "codegen": "graphql-codegen --config codegen.ts",
     "update-schema": "node scripts/fetch-schema.mjs && npm run codegen",
@@ -70,17 +70,16 @@
     "@mcp-b/webmcp-polyfill": "3.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
     "@graphql-codegen/cli": "^7.1.3",
-    "@graphql-codegen/typescript": "^6.0.2",
     "@graphql-codegen/typescript-operations": "^6.0.5",
     "@playwright/test": "^1.57.0",
     "@types/node": "^20.10.0",
-    "@typescript-eslint/eslint-plugin": "^6.13.0",
-    "@typescript-eslint/parser": "^6.13.0",
-    "eslint": "^8.55.0",
+    "eslint": "^9.39.4",
     "graphql": "^16.14.2",
     "tsup": "^8.0.1",
     "typescript": "^5.3.0",
+    "typescript-eslint": "^8.62.1",
     "vitest": "^1.0.0"
   },
   "engines": {
