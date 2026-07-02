@@ -144,7 +144,7 @@ The registration strategy:
 
 ## API reference
 
-All methods return Promises. Connection/edge responses are flattened into plain arrays.
+All methods return Promises. Connection/edge responses are flattened into plain arrays. This is a summary — for per-method examples, the underlying GraphQL documents, and the agent integration guide, see **[docs/api.md](docs/api.md)**.
 
 ### Products
 
@@ -177,7 +177,7 @@ All methods return Promises. Connection/edge responses are flattened into plain 
 | `getCategoryTree(depth?)` | Category hierarchy |
 | `getStoreSettings()` | Store name, URLs, currencies, and settings |
 | `getWebPages(filters?)` | CMS web pages (contact, content pages, links) |
-| `getWebPage(path)` | A single web page with content |
+| `getWebPage(entityId)` | A single web page with content |
 
 ### Customer account
 
@@ -185,7 +185,8 @@ These require an authenticated customer session (the shopper is logged in on the
 
 | Method | Description |
 | --- | --- |
-| `isLoggedIn()` | Whether a customer session exists |
+| `login(email, password)` / `logout()` | Establish / end a customer session (never exposed as agent tools) |
+| `isLoggedIn()` | Returns the `Customer` when a session exists, `null` otherwise (never throws) |
 | `getCustomer()` / `updateCustomer(input)` | Read / update the customer profile |
 | `getCustomerAddresses()` | List saved addresses |
 | `addCustomerAddress(input)` / `updateCustomerAddress(id, input)` / `deleteCustomerAddress(id)` | Manage addresses |
