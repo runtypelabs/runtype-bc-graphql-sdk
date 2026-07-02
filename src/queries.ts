@@ -713,6 +713,25 @@ export const GET_CATEGORY_TREE = `
   }
 `
 
+export const GET_BRANDS = `
+  query GetBrands($first: Int = 50) {
+    site {
+      brands(first: $first) {
+        edges {
+          node {
+            entityId
+            name
+            path
+            defaultImage {
+              url(width: 160)
+            }
+          }
+        }
+      }
+    }
+  }
+`
+
 export const GET_STORE_SETTINGS = `
   query GetStoreSettings {
     site {
@@ -1053,6 +1072,7 @@ export const QUERIES = {
   GET_CONFIGURED_PRODUCT,
   GET_CART,
   GET_CATEGORY_TREE,
+  GET_BRANDS,
   GET_STORE_SETTINGS,
   GET_CUSTOMER,
   GET_CUSTOMER_ADDRESSES,

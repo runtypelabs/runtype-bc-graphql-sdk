@@ -42,14 +42,82 @@ export interface ToolDefinition {
   readOnly: boolean
 }
 
+/**
+ * Stable error categories shared by every tool, so an agent can decide what to
+ * do next from `errorType` alone: retry (`NETWORK`), change inputs
+ * (`INVALID_INPUT`, `OPTIONS_REQUIRED`, `NOT_FOUND`), or ask the customer to
+ * log in (`NOT_LOGGED_IN`). `retryable` makes the retry decision explicit.
+ */
+export type ToolErrorType =
+  | 'NOT_FOUND'
+  | 'NOT_LOGGED_IN'
+  | 'OPTIONS_REQUIRED'
+  | 'INVALID_INPUT'
+  | 'NETWORK'
+  | 'UNKNOWN'
+
 // Tool result types
 export interface ToolResult<T = unknown> {
   success: boolean
   data?: T
   error?: string
   errorType?: string
+  retryable?: boolean
   hint?: string
 }
+
+const NETWORK_ERROR_RE = /network|timeout|timed out|abort|failed to fetch|load failed|socket|econn/i
+const AUTH_ERROR_RE = /not logged in|log in|login required|unauthorized|not authorized|forbidden|401|403/i
+
+/**
+ * Normalize a thrown error into the shared ToolResult error shape, classifying
+ * it as retryable (transient network failure) or permanent so the agent knows
+ * whether retrying the same call can succeed.
+ */
+function toolError(error: unknown, hint?: string): ToolResult {
+  const message = error instanceof Error ? error.message : String(error)
+  if (AUTH_ERROR_RE.test(message)) {
+    return {
+      success: false,
+      error: message,
+      errorType: 'NOT_LOGGED_IN',
+      retryable: false,
+      hint: hint || 'The customer must log in to their store account before this tool can be used.',
+    }
+  }
+  const isNetwork = NETWORK_ERROR_RE.test(message)
+  return {
+    success: false,
+    error: message,
+    errorType: isNetwork ? 'NETWORK' : 'UNKNOWN',
+    retryable: isNetwork,
+    hint,
+  }
+}
+
+/**
+ * Convert an HTML fragment to compact plain text so page content doesn't spend
+ * tokens on markup. Block-level closers become newlines to preserve structure.
+ */
+function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|ul|ol|table|tr|h[1-6]|blockquote)>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#0?39;|&apos;/gi, "'")
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\s*\n\s*/g, '\n')
+    .trim()
+}
+
+/** Maximum variants included in product detail responses (see variantCount). */
+const MAX_VARIANTS_RETURNED = 10
 
 export interface SearchProductsResult extends ToolResult {
   totalItems?: number
@@ -89,6 +157,8 @@ export interface ProductDetailsResult extends ToolResult {
     stockLevel?: number
     options?: unknown[]
     variants?: unknown[]
+    variantCount?: number
+    variantsTruncated?: boolean
     reviews?: unknown
     relatedProducts?: unknown[]
   }
@@ -135,13 +205,15 @@ export const BigCommerceLocalTools = {
     name: 'search_products',
     description: `Search the BigCommerce product catalog. Use this to find products based on:
 - Text search queries (product names, descriptions, SKUs)
-- Category filtering (by category ID)
-- Brand filtering (by brand IDs)
+- Category filtering (by category ID — discover IDs with get_categories)
+- Brand filtering (by brand IDs — discover IDs with get_brands)
 - Price range filtering (min/max price)
 - Rating filtering (min/max rating 1-5)
 - Stock availability filtering
 
 Returns matching products with names, prices, images, and availability. Also returns available filter facets for refinement.
+
+If hasMoreResults is true, pass the returned nextCursor as the "after" parameter (with the same filters) to fetch the next page.
 
 Call this FIRST when a user asks about products, wants to browse, or needs product recommendations.`,
     toolType: 'local' as const,
@@ -154,17 +226,17 @@ Call this FIRST when a user asks about products, wants to browse, or needs produ
         },
         categoryId: {
           type: 'number',
-          description: 'Filter products by a specific category ID',
+          description: 'Filter products by a specific category ID (from get_categories). Use either categoryId or categoryIds, not both.',
         },
         categoryIds: {
           type: 'array',
           items: { type: 'number' },
-          description: 'Filter products by multiple category IDs',
+          description: 'Filter products by multiple category IDs (from get_categories). Use either categoryId or categoryIds, not both.',
         },
         brandIds: {
           type: 'array',
           items: { type: 'number' },
-          description: 'Filter products by brand IDs',
+          description: 'Filter products by brand IDs (from get_brands)',
         },
         price: {
           type: 'object',
@@ -191,6 +263,10 @@ Call this FIRST when a user asks about products, wants to browse, or needs produ
           default: 12,
           description: 'Number of products to return (default: 12)',
         },
+        after: {
+          type: 'string',
+          description: 'Pagination cursor: pass the nextCursor from a previous search_products result to fetch the next page (keep the other parameters the same)',
+        },
         sort: {
           type: 'string',
           enum: ['A_TO_Z', 'Z_TO_A', 'LOWEST_PRICE', 'HIGHEST_PRICE', 'NEWEST', 'BEST_SELLING', 'BEST_REVIEWED', 'RELEVANCE'],
@@ -207,7 +283,7 @@ Call this FIRST when a user asks about products, wants to browse, or needs produ
 - All images
 - Pricing (regular, sale, retail prices)
 - Product options (size, color, etc.) with available values
-- All variants with their specific SKUs and prices
+- Variants with their specific SKUs and prices (first 10; variantCount has the total — use configure_product to resolve a specific option combination)
 - Inventory/stock status
 - Related products
 - Customer reviews summary
@@ -309,9 +385,11 @@ Call this to check what's in the cart, show cart summary, or before checkout.`,
 - Products with options (include variantId or selectedOptions)
 - Multiple items at once
 
-IMPORTANT: If a product has required options (like Size), you MUST either:
-1. Include the variantId, OR
-2. Include selectedOptions with all required option selections
+IMPORTANT: If a product has required options (like Size), you MUST include EXACTLY ONE of:
+1. variantEntityId (preferred when you know the exact variant), OR
+2. selectedOptions with all required option selections
+
+Never include both variantEntityId and selectedOptions for the same item.
 
 If you're unsure, call get_product_details first to see the required options.
 
@@ -492,6 +570,27 @@ Use this to help users browse by category or to understand the store's organizat
           type: 'number',
           default: 3,
           description: 'How deep to fetch the category tree (default: 3 levels)',
+        },
+      },
+    },
+  },
+
+  get_brands: {
+    name: 'get_brands',
+    description: `Get the store's product brands. Returns each brand's:
+- Brand ID and name
+- URL path
+- Logo image (if set)
+
+Use this to help users browse by brand, or to look up brand IDs before filtering search_products with brandIds.`,
+    toolType: 'local' as const,
+    parametersSchema: {
+      type: 'object',
+      properties: {
+        first: {
+          type: 'number',
+          default: 50,
+          description: 'Maximum number of brands to return (default: 50)',
         },
       },
     },
@@ -812,7 +911,7 @@ Use this FIRST to discover which page answers a policy/shipping/returns/FAQ ques
 
   get_web_page: {
     name: 'get_web_page',
-    description: `Get the full content of a single web content page by its entity ID. Returns the page name, path, plain-text summary, and full HTML body.
+    description: `Get the full content of a single web content page by its entity ID. Returns the page name, path, plain-text summary, and the page content as plain text (or raw HTML if format is "html").
 
 Use this after get_web_pages to read a page's content so you can answer policy/shipping/returns/FAQ questions directly without sending the customer away.`,
     toolType: 'local' as const,
@@ -822,6 +921,12 @@ Use this after get_web_pages to read a page's content so you can answer policy/s
         entityId: {
           type: 'number',
           description: 'The web page entity ID to retrieve (from get_web_pages)',
+        },
+        format: {
+          type: 'string',
+          enum: ['text', 'html'],
+          default: 'text',
+          description: 'Content format: "text" (default, compact plain text) or "html" (raw HTML, only if markup is needed)',
         },
       },
       required: ['entityId'],
@@ -843,6 +948,7 @@ export const READ_ONLY_TOOL_NAMES = [
   'get_cart',
   'proceed_to_checkout',
   'get_categories',
+  'get_brands',
   'get_store_info',
   'check_login_status',
   'get_customer_profile',
@@ -874,6 +980,7 @@ interface SearchProductsArgs {
   rating?: { minRating?: number; maxRating?: number }
   hideOutOfStock?: boolean
   first?: number
+  after?: string
   sort?: SortOrder
 }
 
@@ -943,6 +1050,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           rating: args.rating,
           hideOutOfStock: args.hideOutOfStock,
           first: args.first || 12,
+          after: args.after,
           sort: args.sort,
         })
 
@@ -967,11 +1075,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           nextCursor: result.pageInfo?.endCursor,
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'SEARCH_ERROR',
-        }
+        return toolError(error)
       }
     },
 
@@ -984,11 +1088,18 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
             success: false,
             error: `Product with ID ${args.productId} not found`,
             errorType: 'NOT_FOUND',
+            retryable: false,
           }
         }
 
+        const allVariants = product.variants || []
+        const variantsTruncated = allVariants.length > MAX_VARIANTS_RETURNED
+
         return {
           success: true,
+          hint: variantsTruncated
+            ? `Only the first ${MAX_VARIANTS_RETURNED} of ${allVariants.length} variants are included. Use configure_product with selected options to resolve a specific variant.`
+            : undefined,
           product: {
             id: product.entityId,
             name: product.name,
@@ -1022,7 +1133,9 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
                 imageUrl: v.imageUrl,
               })),
             })),
-            variants: product.variants?.map((v) => ({
+            variantCount: allVariants.length,
+            variantsTruncated,
+            variants: allVariants.slice(0, MAX_VARIANTS_RETURNED).map((v) => ({
               id: v.entityId,
               sku: v.sku,
               price: v.prices?.price,
@@ -1049,11 +1162,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'FETCH_ERROR',
-        }
+        return toolError(error)
       }
     },
 
@@ -1066,8 +1175,11 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
             success: false,
             error: `No product found at path: ${args.path}`,
             errorType: 'NOT_FOUND',
+            retryable: false,
           }
         }
+
+        const allVariants = product.variants || []
 
         return {
           success: true,
@@ -1089,15 +1201,13 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
               required: opt.isRequired,
               values: opt.values,
             })),
-            variants: product.variants,
+            variantCount: allVariants.length,
+            variantsTruncated: allVariants.length > MAX_VARIANTS_RETURNED,
+            variants: allVariants.slice(0, MAX_VARIANTS_RETURNED),
           },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'FETCH_ERROR',
-        }
+        return toolError(error)
       }
     },
 
@@ -1109,7 +1219,9 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           return {
             success: false,
             error: 'Failed to configure product with selected options',
-            errorType: 'CONFIGURATION_ERROR',
+            errorType: 'INVALID_INPUT',
+            retryable: false,
+            hint: 'Check that the option and value IDs come from get_product_details for this product',
           }
         }
 
@@ -1127,11 +1239,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'CONFIGURATION_ERROR',
-        }
+        return toolError(error)
       }
     },
 
@@ -1153,11 +1261,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'CART_ERROR',
-        }
+        return toolError(error)
       }
     },
 
@@ -1181,12 +1285,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'ADD_TO_CART_ERROR',
-          hint: 'If the product has required options, make sure to include variantEntityId or selectedOptions',
-        }
+        return toolError(error, 'If the product has required options, make sure to include variantEntityId or selectedOptions')
       }
     },
 
@@ -1212,6 +1311,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
               })),
             })),
             errorType: 'OPTIONS_REQUIRED',
+            retryable: false,
           }
         }
 
@@ -1224,11 +1324,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'ADD_TO_CART_ERROR',
-        }
+        return toolError(error)
       }
     },
 
@@ -1245,11 +1341,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'UPDATE_ERROR',
-        }
+        return toolError(error)
       }
     },
 
@@ -1266,11 +1358,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'REMOVE_ERROR',
-        }
+        return toolError(error)
       }
     },
 
@@ -1283,11 +1371,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           data: { message: 'Cart has been cleared' },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'CLEAR_ERROR',
-        }
+        return toolError(error)
       }
     },
 
@@ -1312,12 +1396,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           message: 'Checkout URLs generated. Share the checkoutUrl with the user or redirect them.',
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'CHECKOUT_ERROR',
-          hint: 'Make sure there are items in the cart before proceeding to checkout',
-        }
+        return toolError(error, 'Make sure there are items in the cart before proceeding to checkout')
       }
     },
 
@@ -1346,11 +1425,28 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           data: { categories: categories.map(formatCategory) },
         }
       } catch (error) {
+        return toolError(error)
+      }
+    },
+
+    async get_brands(args: { first?: number } = {}): Promise<ToolResult> {
+      try {
+        const brands = await sdk.getBrands(args.first || 50)
+
         return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'CATEGORY_ERROR',
+          success: true,
+          data: {
+            brandCount: brands.length,
+            brands: brands.map((brand) => ({
+              id: brand.entityId,
+              name: brand.name,
+              path: brand.path,
+              logoUrl: brand.defaultImage?.url,
+            })),
+          },
         }
+      } catch (error) {
+        return toolError(error)
       }
     },
 
@@ -1377,11 +1473,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'STORE_INFO_ERROR',
-        }
+        return toolError(error)
       }
     },
 
@@ -1416,11 +1508,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'AUTH_CHECK_ERROR',
-        }
+        return toolError(error)
       }
     },
 
@@ -1433,6 +1521,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
             success: false,
             error: 'Not logged in',
             errorType: 'NOT_LOGGED_IN',
+            retryable: false,
             hint: 'Customer must be logged in to view profile',
           }
         }
@@ -1453,11 +1542,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'PROFILE_ERROR',
-        }
+        return toolError(error)
       }
     },
 
@@ -1469,7 +1554,8 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           return {
             success: false,
             error: 'Failed to update profile',
-            errorType: 'UPDATE_ERROR',
+            errorType: 'UNKNOWN',
+            retryable: false,
           }
         }
 
@@ -1487,11 +1573,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'UPDATE_ERROR',
-        }
+        return toolError(error)
       }
     },
 
@@ -1518,11 +1600,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'ADDRESS_ERROR',
-        }
+        return toolError(error)
       }
     },
 
@@ -1534,7 +1612,9 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           return {
             success: false,
             error: 'Failed to add address',
-            errorType: 'ADD_ADDRESS_ERROR',
+            errorType: 'UNKNOWN',
+            retryable: false,
+            hint: 'The store may require additional verification (e.g., reCAPTCHA) for address creation',
           }
         }
 
@@ -1549,11 +1629,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'ADD_ADDRESS_ERROR',
-        }
+        return toolError(error)
       }
     },
 
@@ -1568,7 +1644,8 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           return {
             success: false,
             error: 'Failed to update address',
-            errorType: 'UPDATE_ADDRESS_ERROR',
+            errorType: 'UNKNOWN',
+            retryable: false,
           }
         }
 
@@ -1582,11 +1659,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'UPDATE_ADDRESS_ERROR',
-        }
+        return toolError(error)
       }
     },
 
@@ -1602,11 +1675,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'DELETE_ADDRESS_ERROR',
-        }
+        return toolError(error)
       }
     },
 
@@ -1638,11 +1707,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'ORDER_HISTORY_ERROR',
-        }
+        return toolError(error)
       }
     },
 
@@ -1655,6 +1720,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
             success: false,
             error: `Order ${args.orderId} not found`,
             errorType: 'NOT_FOUND',
+            retryable: false,
           }
         }
 
@@ -1675,11 +1741,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'ORDER_DETAILS_ERROR',
-        }
+        return toolError(error)
       }
     },
 
@@ -1711,11 +1773,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'WISHLIST_ERROR',
-        }
+        return toolError(error)
       }
     },
 
@@ -1740,11 +1798,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'ADD_WISHLIST_ERROR',
-        }
+        return toolError(error)
       }
     },
 
@@ -1763,11 +1817,7 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'REMOVE_WISHLIST_ERROR',
-        }
+        return toolError(error)
       }
     },
 
@@ -1793,15 +1843,11 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
           },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'WEB_PAGES_ERROR',
-        }
+        return toolError(error)
       }
     },
 
-    async get_web_page(args: { entityId: number }): Promise<ToolResult> {
+    async get_web_page(args: { entityId: number; format?: 'text' | 'html' }): Promise<ToolResult> {
       try {
         const page = await sdk.getWebPage(args.entityId)
 
@@ -1810,8 +1856,11 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
             success: false,
             error: `Web page with ID ${args.entityId} not found`,
             errorType: 'NOT_FOUND',
+            retryable: false,
           }
         }
+
+        const wantsHtml = args.format === 'html'
 
         return {
           success: true,
@@ -1821,16 +1870,13 @@ export function createLocalToolImplementations(sdk: BigCommerceAgentSDK) {
             type: page.type,
             path: page.path,
             summary: page.plainTextSummary,
-            htmlBody: page.htmlBody,
+            content: wantsHtml ? undefined : page.htmlBody && htmlToPlainText(page.htmlBody),
+            htmlBody: wantsHtml ? page.htmlBody : undefined,
             parentId: page.parentEntityId,
           },
         }
       } catch (error) {
-        return {
-          success: false,
-          error: (error as Error).message,
-          errorType: 'WEB_PAGE_ERROR',
-        }
+        return toolError(error)
       }
     },
   }
