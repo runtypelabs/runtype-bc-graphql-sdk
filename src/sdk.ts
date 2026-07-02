@@ -876,7 +876,7 @@ export class BigCommerceAgentSDK {
       customer: {
         orders: Connection<{
           entityId: number
-          orderedAt: string
+          orderedAt: { utc: string }
           status: { value: string; label: string }
           totalIncTax: { value: number; currencyCode: string }
         }>
@@ -889,7 +889,7 @@ export class BigCommerceAgentSDK {
 
     return this.flattenEdges(data.customer.orders).map((order) => ({
       entityId: order.entityId,
-      orderedAt: order.orderedAt,
+      orderedAt: order.orderedAt?.utc,
       status: order.status.label,
       total: order.totalIncTax,
       itemCount: 0, // Would need line items to calculate
@@ -901,19 +901,28 @@ export class BigCommerceAgentSDK {
    */
   async getOrderDetails(orderId: number): Promise<Order | null> {
     const data = await this.executeGraphQL<{
-      customer: {
-        orders: Connection<Order>
-      } | null
+      site: {
+        order:
+          | (Omit<Order, 'orderedAt' | 'updatedAt'> & {
+              orderedAt: { utc: string }
+              updatedAt: { utc: string }
+            })
+          | null
+      }
     }>(QUERIES.GET_ORDER_DETAILS, {
       filter: { entityId: orderId },
     })
 
-    if (!data?.customer?.orders) {
+    const order = data?.site?.order
+    if (!order) {
       return null
     }
 
-    const orders = this.flattenEdges(data.customer.orders)
-    return orders[0] || null
+    return {
+      ...order,
+      orderedAt: order.orderedAt?.utc,
+      updatedAt: order.updatedAt?.utc,
+    }
   }
 
   /**
@@ -957,7 +966,6 @@ export class BigCommerceAgentSDK {
             name: string
             items: Connection<{ entityId: number; productEntityId: number; variantEntityId?: number }>
           } | null
-          errors: Array<{ message: string }>
         }
       }
     }>(MUTATIONS.ADD_WISHLIST_ITEMS, {
@@ -965,10 +973,6 @@ export class BigCommerceAgentSDK {
     })
 
     const result = data?.wishlist?.addWishlistItems
-    if (result?.errors?.length > 0) {
-      throw new Error(result.errors.map((e) => e.message).join(', '))
-    }
-
     if (!result?.result) {
       return null
     }
@@ -1004,7 +1008,6 @@ export class BigCommerceAgentSDK {
             entityId: number
             name: string
           } | null
-          errors: Array<{ message: string }>
         }
       }
     }>(MUTATIONS.DELETE_WISHLIST_ITEMS, {
@@ -1012,10 +1015,6 @@ export class BigCommerceAgentSDK {
     })
 
     const result = data?.wishlist?.deleteWishlistItems
-    if (result?.errors?.length > 0) {
-      throw new Error(result.errors.map((e) => e.message).join(', '))
-    }
-
     if (!result?.result) {
       return null
     }

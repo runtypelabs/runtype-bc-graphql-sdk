@@ -207,6 +207,20 @@ npm run lint         # ESLint
 npm test             # unit tests (Vitest)
 ```
 
+### GraphQL schema & codegen
+
+The BigCommerce Storefront schema is vendored as `schema.graphql` (fetched by introspection from BigCommerce's public GraphQL playground store). Two things are derived from it:
+
+- **Document validation** — `npm test` validates every query/mutation in `src/queries.ts` / `src/mutations.ts` against the schema, so field typos and upstream schema drift fail at test time instead of at runtime.
+- **Generated types** — [GraphQL Code Generator](https://the-guild.dev/graphql/codegen) emits per-operation result/variables TypeScript types to `src/generated/graphql.ts` (committed; CI fails if stale).
+
+```bash
+npm run codegen        # regenerate src/generated from schema.graphql + documents
+npm run update-schema  # re-fetch schema.graphql from BigCommerce, then codegen
+```
+
+A weekly `Schema Drift` workflow re-fetches the upstream schema and fails if it no longer matches the vendored copy.
+
 ### Browser / e2e testing
 
 The e2e suite (Playwright) and the interactive test page run against a real BigCommerce sandbox store over HTTPS:

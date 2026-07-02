@@ -473,17 +473,27 @@ export interface OrderAddress {
 export interface OrderLineItem {
   entityId: number
   productEntityId: number
-  variantEntityId?: number
   name: string
   sku: string
   quantity: number
-  priceBeforeDiscount: Money
-  priceAfterDiscount: Money
-  imageUrl?: string
-  selectedOptions?: Array<{
-    name: string
-    value: string
-  }>
+  subTotalListPrice?: Money
+  subTotalSalePrice?: Money
+  image?: {
+    url?: string
+    altText?: string
+  }
+}
+
+export interface OrderShipment {
+  entityId: number
+  shippedAt?: { utc: string }
+  shippingProviderName?: string
+  shippingMethodName?: string
+  tracking?: {
+    __typename?: string
+    number?: string
+    url?: string
+  }
 }
 
 export interface OrderConsignment {
@@ -492,9 +502,7 @@ export interface OrderConsignment {
   lineItems: OrderLineItem[]
   shippingCost: Money
   handlingCost?: Money
-  status: string
-  trackingNumber?: string
-  trackingUrl?: string
+  shipments?: OrderShipment[]
 }
 
 export interface Order {
@@ -508,10 +516,13 @@ export interface Order {
   billingAddress: OrderAddress
   consignments?: OrderConsignment[]
   subTotal: Money
-  discounts?: Array<{
-    couponCode?: string
-    discountedAmount: Money
-  }>
+  discounts?: {
+    nonCouponDiscountTotal?: Money
+    couponDiscounts?: Array<{
+      couponCode: string
+      discountedAmount: Money
+    }>
+  }
   shippingCostTotal: Money
   taxTotal: Money
   totalIncTax: Money

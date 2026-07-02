@@ -1,0 +1,39 @@
+name: Schema Drift
+
+# Weekly check that the vendored BigCommerce Storefront schema still matches
+# upstream. A failure means BigCommerce changed the schema: run
+# `npm run update-schema`, review the diff (document validation in `npm test`
+# will flag any queries broken by the change), and commit.
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Mondays 6 AM UTC
+  workflow_dispatch:
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fetch upstream schema and regenerate types
+        run: npm run update-schema
+
+      - name: Check for drift
+        run: |
+          git diff --exit-code schema.graphql src/generated || {
+            echo "::error::BigCommerce Storefront schema has drifted from the vendored copy. Run 'npm run update-schema', review, and commit."
+            exit 1
+          }
+
+      - name: Validate documents against the fresh schema
+        run: npx vitest run test/unit/graphql-documents.test.ts
