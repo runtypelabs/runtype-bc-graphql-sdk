@@ -24,6 +24,7 @@ const CORE_TOOL_NAMES = [
   'clear_cart',
   'proceed_to_checkout',
   'get_categories',
+  'get_brands',
   'get_store_info',
   'check_login_status',
   'get_customer_profile',
@@ -113,7 +114,53 @@ describe('createLocalToolImplementations', () => {
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('network down')
-    expect(result.errorType).toBe('SEARCH_ERROR')
+    expect(result.errorType).toBe('NETWORK')
+    expect(result.retryable).toBe(true)
+  })
+
+  it('classifies auth failures as NOT_LOGGED_IN and not retryable', async () => {
+    const sdk = {
+      getCustomerAddresses: async () => {
+        throw new Error('Not authorized to query customer')
+      },
+    } as unknown as BigCommerceAgentSDK
+    const impls = createLocalToolImplementations(sdk)
+
+    const result = await impls.get_customer_addresses({})
+
+    expect(result.success).toBe(false)
+    expect(result.errorType).toBe('NOT_LOGGED_IN')
+    expect(result.retryable).toBe(false)
+    expect(result.hint).toMatch(/log in/i)
+  })
+
+  it('classifies unrecognized failures as UNKNOWN and not retryable', async () => {
+    const sdk = {
+      getCategoryTree: async () => {
+        throw new Error('something exploded')
+      },
+    } as unknown as BigCommerceAgentSDK
+    const impls = createLocalToolImplementations(sdk)
+
+    const result = await impls.get_categories({})
+
+    expect(result.success).toBe(false)
+    expect(result.errorType).toBe('UNKNOWN')
+    expect(result.retryable).toBe(false)
+  })
+
+  it('keeps tool-specific hints on classified errors', async () => {
+    const sdk = {
+      addToCart: async () => {
+        throw new Error('missing required options')
+      },
+    } as unknown as BigCommerceAgentSDK
+    const impls = createLocalToolImplementations(sdk)
+
+    const result = await impls.add_to_cart({ items: [{ productEntityId: 1 }] })
+
+    expect(result.success).toBe(false)
+    expect(result.hint).toContain('variantEntityId or selectedOptions')
   })
 
   it('returns NOT_FOUND for a missing product', async () => {
@@ -126,6 +173,7 @@ describe('createLocalToolImplementations', () => {
 
     expect(result.success).toBe(false)
     expect(result.errorType).toBe('NOT_FOUND')
+    expect(result.retryable).toBe(false)
     expect(result.error).toContain('999')
   })
 
@@ -145,5 +193,144 @@ describe('createLocalToolImplementations', () => {
     expect(result.success).toBe(true)
     expect(result.totalItems).toBe(1)
     expect(result.products?.[0]?.name).toBe('Alpha')
+  })
+})
+
+describe('search_products pagination', () => {
+  it('declares the after parameter in the tool schema', () => {
+    const def = getAllToolDefinitions().find((d) => d.name === 'search_products')
+    expect(def?.parametersSchema.properties?.after).toBeDefined()
+  })
+
+  it('passes the after cursor through to the SDK', async () => {
+    let received: { after?: string } | undefined
+    const sdk = {
+      searchProducts: async (params: { after?: string }) => {
+        received = params
+        return { totalItems: 0, products: [], filters: [], pageInfo: null }
+      },
+    } as unknown as BigCommerceAgentSDK
+    const impls = createLocalToolImplementations(sdk)
+
+    await impls.search_products({ searchTerm: 'a', after: 'cursor-1' })
+
+    expect(received?.after).toBe('cursor-1')
+  })
+
+  it('surfaces the next cursor so the agent can continue', async () => {
+    const sdk = {
+      searchProducts: async () => ({
+        totalItems: 24,
+        products: [],
+        filters: [],
+        pageInfo: { hasNextPage: true, endCursor: 'cursor-2' },
+      }),
+    } as unknown as BigCommerceAgentSDK
+    const impls = createLocalToolImplementations(sdk)
+
+    const result = await impls.search_products({})
+
+    expect(result.hasMoreResults).toBe(true)
+    expect(result.nextCursor).toBe('cursor-2')
+  })
+})
+
+describe('get_brands', () => {
+  it('is registered as a read-only tool', () => {
+    const def = getAllToolDefinitions().find((d) => d.name === 'get_brands')
+    expect(def).toBeDefined()
+    expect(def?.readOnly).toBe(true)
+  })
+
+  it('maps brands into agent-friendly shapes', async () => {
+    const sdk = {
+      getBrands: async () => [
+        { entityId: 1, name: 'Acme', path: '/acme/', defaultImage: { url: 'logo.png' } },
+        { entityId: 2, name: 'Zenith', path: '/zenith/' },
+      ],
+    } as unknown as BigCommerceAgentSDK
+    const impls = createLocalToolImplementations(sdk)
+
+    const result = await impls.get_brands({})
+
+    expect(result.success).toBe(true)
+    const data = result.data as { brandCount: number; brands: Array<Record<string, unknown>> }
+    expect(data.brandCount).toBe(2)
+    expect(data.brands[0]).toEqual({ id: 1, name: 'Acme', path: '/acme/', logoUrl: 'logo.png' })
+    expect(data.brands[1].logoUrl).toBeUndefined()
+  })
+})
+
+describe('get_product_details variant capping', () => {
+  const productWithVariants = (count: number) => ({
+    entityId: 9,
+    name: 'Configurable',
+    sku: 'CFG',
+    path: '/cfg/',
+    variants: Array.from({ length: count }, (_, i) => ({ entityId: i + 1, sku: `V${i + 1}` })),
+  })
+
+  it('caps returned variants and reports the full count', async () => {
+    const sdk = {
+      getProductById: async () => productWithVariants(25),
+    } as unknown as BigCommerceAgentSDK
+    const impls = createLocalToolImplementations(sdk)
+
+    const result = await impls.get_product_details({ productId: 9 })
+
+    expect(result.success).toBe(true)
+    expect(result.product?.variants).toHaveLength(10)
+    expect(result.product?.variantCount).toBe(25)
+    expect(result.product?.variantsTruncated).toBe(true)
+    expect(result.hint).toContain('configure_product')
+  })
+
+  it('returns all variants untruncated when under the cap', async () => {
+    const sdk = {
+      getProductById: async () => productWithVariants(3),
+    } as unknown as BigCommerceAgentSDK
+    const impls = createLocalToolImplementations(sdk)
+
+    const result = await impls.get_product_details({ productId: 9 })
+
+    expect(result.product?.variants).toHaveLength(3)
+    expect(result.product?.variantCount).toBe(3)
+    expect(result.product?.variantsTruncated).toBe(false)
+    expect(result.hint).toBeUndefined()
+  })
+})
+
+describe('get_web_page content formats', () => {
+  const page = {
+    entityId: 5,
+    name: 'Shipping',
+    type: 'NormalPage',
+    path: '/shipping/',
+    plainTextSummary: 'summary',
+    htmlBody:
+      '<div><h1>Shipping</h1><p>We ship &amp; handle in 2&nbsp;days.</p><script>evil()</script></div>',
+  }
+
+  it('returns compact plain text by default and omits the HTML body', async () => {
+    const sdk = { getWebPage: async () => page } as unknown as BigCommerceAgentSDK
+    const impls = createLocalToolImplementations(sdk)
+
+    const result = await impls.get_web_page({ entityId: 5 })
+
+    expect(result.success).toBe(true)
+    const data = result.data as { content?: string; htmlBody?: string }
+    expect(data.content).toBe('Shipping\nWe ship & handle in 2 days.')
+    expect(data.htmlBody).toBeUndefined()
+  })
+
+  it('returns raw HTML only when format is html', async () => {
+    const sdk = { getWebPage: async () => page } as unknown as BigCommerceAgentSDK
+    const impls = createLocalToolImplementations(sdk)
+
+    const result = await impls.get_web_page({ entityId: 5, format: 'html' })
+
+    const data = result.data as { content?: string; htmlBody?: string }
+    expect(data.htmlBody).toContain('<h1>')
+    expect(data.content).toBeUndefined()
   })
 })
