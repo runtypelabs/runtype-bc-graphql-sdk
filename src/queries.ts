@@ -2,7 +2,7 @@
  * BigCommerce Storefront GraphQL Queries
  */
 
-export const SEARCH_PRODUCTS = `
+export const SEARCH_PRODUCTS = /* GraphQL */ `
   query SearchProducts(
     $searchTerm: String
     $categoryEntityId: Int
@@ -153,7 +153,7 @@ export const SEARCH_PRODUCTS = `
   }
 `
 
-export const GET_PRODUCT_BY_ID = `
+export const GET_PRODUCT_BY_ID = /* GraphQL */ `
   query GetProductById($entityId: Int!, $variantEntityId: Int) {
     site {
       product(entityId: $entityId, variantEntityId: $variantEntityId) {
@@ -382,7 +382,7 @@ export const GET_PRODUCT_BY_ID = `
   }
 `
 
-export const GET_PRODUCT_BY_PATH = `
+export const GET_PRODUCT_BY_PATH = /* GraphQL */ `
   query GetProductByPath($path: String!) {
     site {
       route(path: $path) {
@@ -509,7 +509,7 @@ export const GET_PRODUCT_BY_PATH = `
   }
 `
 
-export const GET_CONFIGURED_PRODUCT = `
+export const GET_CONFIGURED_PRODUCT = /* GraphQL */ `
   query GetConfiguredProduct($entityId: Int!, $optionValueIds: [OptionValueId!]) {
     site {
       product(entityId: $entityId, optionValueIds: $optionValueIds) {
@@ -575,7 +575,7 @@ export const GET_CONFIGURED_PRODUCT = `
   }
 `
 
-export const GET_CART = `
+export const GET_CART = /* GraphQL */ `
   query GetCart($cartEntityId: String) {
     site {
       cart(entityId: $cartEntityId) {
@@ -684,7 +684,7 @@ export const GET_CART = `
   }
 `
 
-export const GET_CATEGORY_TREE = `
+export const GET_CATEGORY_TREE = /* GraphQL */ `
   query GetCategoryTree {
     site {
       categoryTree {
@@ -713,7 +713,7 @@ export const GET_CATEGORY_TREE = `
   }
 `
 
-export const GET_BRANDS = `
+export const GET_BRANDS = /* GraphQL */ `
   query GetBrands($first: Int = 50) {
     site {
       brands(first: $first) {
@@ -732,7 +732,7 @@ export const GET_BRANDS = `
   }
 `
 
-export const GET_STORE_SETTINGS = `
+export const GET_STORE_SETTINGS = /* GraphQL */ `
   query GetStoreSettings {
     site {
       settings {
@@ -765,7 +765,7 @@ export const GET_STORE_SETTINGS = `
 // Customer Queries
 // ---------------------------------------------------------------------------
 
-export const GET_CUSTOMER = `
+export const GET_CUSTOMER = /* GraphQL */ `
   query GetCustomer {
     customer {
       entityId
@@ -786,7 +786,7 @@ export const GET_CUSTOMER = `
   }
 `
 
-export const GET_CUSTOMER_ADDRESSES = `
+export const GET_CUSTOMER_ADDRESSES = /* GraphQL */ `
   query GetCustomerAddresses($first: Int = 50, $after: String) {
     customer {
       entityId
@@ -815,7 +815,7 @@ export const GET_CUSTOMER_ADDRESSES = `
   }
 `
 
-export const GET_CUSTOMER_ORDERS = `
+export const GET_CUSTOMER_ORDERS = /* GraphQL */ `
   query GetCustomerOrders($first: Int = 20, $after: String) {
     customer {
       entityId
@@ -827,8 +827,12 @@ export const GET_CUSTOMER_ORDERS = `
         edges {
           node {
             entityId
-            orderedAt
-            updatedAt
+            orderedAt {
+              utc
+            }
+            updatedAt {
+              utc
+            }
             status {
               value
               label
@@ -844,107 +848,139 @@ export const GET_CUSTOMER_ORDERS = `
   }
 `
 
-export const GET_ORDER_DETAILS = `
+export const GET_ORDER_DETAILS = /* GraphQL */ `
   query GetOrderDetails($filter: OrderFilterInput) {
-    customer {
-      orders(first: 1, filter: $filter) {
-        edges {
-          node {
-            entityId
-            orderedAt
-            updatedAt
-            status {
-              value
-              label
-            }
-            billingAddress {
-              firstName
-              lastName
-              email
-              company
-              address1
-              address2
-              city
-              stateOrProvince
-              postalCode
-              countryCode
-              phone
-            }
-            consignments {
-              shipping {
-                edges {
-                  node {
-                    entityId
-                    status
-                    shippingAddress {
-                      firstName
-                      lastName
-                      email
-                      company
-                      address1
-                      address2
-                      city
-                      stateOrProvince
-                      postalCode
-                      countryCode
-                      phone
-                    }
-                    shippingCost {
-                      value
-                      currencyCode
-                    }
-                    handlingCost {
-                      value
-                      currencyCode
-                    }
-                    lineItems {
-                      edges {
-                        node {
-                          entityId
-                          productEntityId
-                          variantEntityId
-                          name
-                          sku
-                          quantity
-                          subTotalListPrice {
-                            value
-                            currencyCode
-                          }
-                          subTotalSalePrice {
-                            value
-                            currencyCode
-                          }
-                          imageUrl
+    site {
+      order(filter: $filter) {
+        entityId
+        orderedAt {
+          utc
+        }
+        updatedAt {
+          utc
+        }
+        status {
+          value
+          label
+        }
+        billingAddress {
+          firstName
+          lastName
+          email
+          company
+          address1
+          address2
+          city
+          stateOrProvince
+          postalCode
+          countryCode
+          phone
+        }
+        consignments {
+          shipping {
+            edges {
+              node {
+                entityId
+                shippingAddress {
+                  firstName
+                  lastName
+                  email
+                  company
+                  address1
+                  address2
+                  city
+                  stateOrProvince
+                  postalCode
+                  countryCode
+                  phone
+                }
+                shippingCost {
+                  value
+                  currencyCode
+                }
+                handlingCost {
+                  value
+                  currencyCode
+                }
+                shipments(first: 10) {
+                  edges {
+                    node {
+                      entityId
+                      shippedAt {
+                        utc
+                      }
+                      shippingProviderName
+                      shippingMethodName
+                      tracking {
+                        __typename
+                        ... on OrderShipmentNumberAndUrlTracking {
+                          number
+                          url
                         }
+                        ... on OrderShipmentNumberOnlyTracking {
+                          number
+                        }
+                        ... on OrderShipmentUrlOnlyTracking {
+                          url
+                        }
+                      }
+                    }
+                  }
+                }
+                lineItems {
+                  edges {
+                    node {
+                      entityId
+                      productEntityId
+                      name
+                      sku
+                      quantity
+                      subTotalListPrice {
+                        value
+                        currencyCode
+                      }
+                      subTotalSalePrice {
+                        value
+                        currencyCode
+                      }
+                      image {
+                        url(width: 160)
+                        altText
                       }
                     }
                   }
                 }
               }
             }
-            subTotal {
+          }
+        }
+        subTotal {
+          value
+          currencyCode
+        }
+        shippingCostTotal {
+          value
+          currencyCode
+        }
+        taxTotal {
+          value
+          currencyCode
+        }
+        totalIncTax {
+          value
+          currencyCode
+        }
+        customerMessage
+        discounts {
+          nonCouponDiscountTotal {
+            value
+            currencyCode
+          }
+          couponDiscounts {
+            couponCode
+            discountedAmount {
               value
               currencyCode
-            }
-            shippingCostTotal {
-              value
-              currencyCode
-            }
-            taxTotal {
-              value
-              currencyCode
-            }
-            totalIncTax {
-              value
-              currencyCode
-            }
-            customerMessage
-            discounts {
-              couponCode
-              discountedAmount {
-                value
-                currencyCode
-              }
             }
           }
         }
@@ -953,7 +989,7 @@ export const GET_ORDER_DETAILS = `
   }
 `
 
-export const GET_CUSTOMER_WISHLISTS = `
+export const GET_CUSTOMER_WISHLISTS = /* GraphQL */ `
   query GetCustomerWishlists($first: Int = 10) {
     customer {
       entityId
@@ -1003,7 +1039,7 @@ export const GET_CUSTOMER_WISHLISTS = `
 // Web Content Page Queries
 // ---------------------------------------------------------------------------
 
-export const GET_WEB_PAGES = `
+export const GET_WEB_PAGES = /* GraphQL */ `
   query GetWebPages($filters: WebPagesFiltersInput) {
     site {
       content {
@@ -1031,7 +1067,7 @@ export const GET_WEB_PAGES = `
   }
 `
 
-export const GET_WEB_PAGE = `
+export const GET_WEB_PAGE = /* GraphQL */ `
   query GetWebPage($entityId: Int!) {
     site {
       content {

@@ -2,7 +2,7 @@
  * BigCommerce Storefront GraphQL Mutations
  */
 
-export const CREATE_CART = `
+export const CREATE_CART = /* GraphQL */ `
   mutation CreateCart($input: CreateCartInput!) {
     cart {
       createCart(input: $input) {
@@ -47,7 +47,7 @@ export const CREATE_CART = `
   }
 `
 
-export const ADD_CART_LINE_ITEMS = `
+export const ADD_CART_LINE_ITEMS = /* GraphQL */ `
   mutation AddCartLineItems($input: AddCartLineItemsInput!) {
     cart {
       addCartLineItems(input: $input) {
@@ -88,7 +88,7 @@ export const ADD_CART_LINE_ITEMS = `
   }
 `
 
-export const UPDATE_CART_LINE_ITEM = `
+export const UPDATE_CART_LINE_ITEM = /* GraphQL */ `
   mutation UpdateCartLineItem($input: UpdateCartLineItemInput!) {
     cart {
       updateCartLineItem(input: $input) {
@@ -111,7 +111,7 @@ export const UPDATE_CART_LINE_ITEM = `
   }
 `
 
-export const DELETE_CART_LINE_ITEM = `
+export const DELETE_CART_LINE_ITEM = /* GraphQL */ `
   mutation DeleteCartLineItem($input: DeleteCartLineItemInput!) {
     cart {
       deleteCartLineItem(input: $input) {
@@ -133,7 +133,7 @@ export const DELETE_CART_LINE_ITEM = `
   }
 `
 
-export const DELETE_CART = `
+export const DELETE_CART = /* GraphQL */ `
   mutation DeleteCart($input: DeleteCartInput!) {
     cart {
       deleteCart(input: $input) {
@@ -143,7 +143,7 @@ export const DELETE_CART = `
   }
 `
 
-export const CREATE_CART_REDIRECT_URLS = `
+export const CREATE_CART_REDIRECT_URLS = /* GraphQL */ `
   mutation CreateCartRedirectUrls($input: CreateCartRedirectUrlsInput!) {
     cart {
       createCartRedirectUrls(input: $input) {
@@ -160,7 +160,7 @@ export const CREATE_CART_REDIRECT_URLS = `
 // Customer Mutations
 // ---------------------------------------------------------------------------
 
-export const UPDATE_CUSTOMER = `
+export const UPDATE_CUSTOMER = /* GraphQL */ `
   mutation UpdateCustomer($input: UpdateCustomerInput!) {
     customer {
       updateCustomer(input: $input) {
@@ -186,7 +186,7 @@ export const UPDATE_CUSTOMER = `
   }
 `
 
-export const ADD_CUSTOMER_ADDRESS = `
+export const ADD_CUSTOMER_ADDRESS = /* GraphQL */ `
   mutation AddCustomerAddress($input: AddCustomerAddressInput!) {
     customer {
       addCustomerAddress(input: $input) {
@@ -220,7 +220,7 @@ export const ADD_CUSTOMER_ADDRESS = `
   }
 `
 
-export const UPDATE_CUSTOMER_ADDRESS = `
+export const UPDATE_CUSTOMER_ADDRESS = /* GraphQL */ `
   mutation UpdateCustomerAddress($input: UpdateCustomerAddressInput!) {
     customer {
       updateCustomerAddress(input: $input) {
@@ -254,7 +254,7 @@ export const UPDATE_CUSTOMER_ADDRESS = `
   }
 `
 
-export const DELETE_CUSTOMER_ADDRESS = `
+export const DELETE_CUSTOMER_ADDRESS = /* GraphQL */ `
   mutation DeleteCustomerAddress($input: DeleteCustomerAddressInput!) {
     customer {
       deleteCustomerAddress(input: $input) {
@@ -271,7 +271,7 @@ export const DELETE_CUSTOMER_ADDRESS = `
   }
 `
 
-export const ADD_WISHLIST_ITEMS = `
+export const ADD_WISHLIST_ITEMS = /* GraphQL */ `
   mutation AddWishlistItems($input: AddWishlistItemsInput!) {
     wishlist {
       addWishlistItems(input: $input) {
@@ -288,28 +288,18 @@ export const ADD_WISHLIST_ITEMS = `
             }
           }
         }
-        errors {
-          ... on CustomerNotLoggedInError {
-            message
-          }
-        }
       }
     }
   }
 `
 
-export const DELETE_WISHLIST_ITEMS = `
+export const DELETE_WISHLIST_ITEMS = /* GraphQL */ `
   mutation DeleteWishlistItems($input: DeleteWishlistItemsInput!) {
     wishlist {
       deleteWishlistItems(input: $input) {
         result {
           entityId
           name
-        }
-        errors {
-          ... on CustomerNotLoggedInError {
-            message
-          }
         }
       }
     }
@@ -320,7 +310,7 @@ export const DELETE_WISHLIST_ITEMS = `
 // Authentication Mutations
 // ---------------------------------------------------------------------------
 
-export const LOGIN = `
+export const LOGIN = /* GraphQL */ `
   mutation Login($email: String!, $password: String!) {
     login(email: $email, password: $password) {
       customer {
@@ -333,7 +323,7 @@ export const LOGIN = `
   }
 `
 
-export const LOGOUT = `
+export const LOGOUT = /* GraphQL */ `
   mutation Logout {
     logout {
       result

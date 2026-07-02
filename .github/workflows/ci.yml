@@ -25,6 +25,14 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      - name: Check generated GraphQL types are fresh
+        run: |
+          npm run codegen
+          git diff --exit-code src/generated || {
+            echo "::error::src/generated is stale — run 'npm run codegen' and commit the result."
+            exit 1
+          }
+
       - name: Lint
         run: npm run lint
 

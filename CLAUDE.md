@@ -14,6 +14,15 @@ npm run build        # Build all bundles (ESM, CJS, browser IIFE)
 npm run typecheck    # Run TypeScript type checking
 npm run lint         # Run ESLint
 npm run lint:fix     # Auto-fix lint issues
+npm run codegen      # Regenerate src/generated/graphql.ts from schema.graphql + documents
+npm run update-schema # Re-fetch schema.graphql from BigCommerce, then run codegen
+```
+
+## GraphQL Schema
+
+The BigCommerce Storefront schema is vendored at `schema.graphql` (introspected from the public GraphQL playground store, see `scripts/fetch-schema.mjs`). Every document in `src/queries.ts` / `src/mutations.ts` is validated against it by `test/unit/graphql-documents.test.ts`, and GraphQL Code Generator emits types to `src/generated/graphql.ts` (committed — CI fails if stale). After editing any query/mutation, run `npm run codegen`. Documents must keep their `/* GraphQL */` template annotation so codegen can extract them.
+
+```bash
 ```
 
 ## Testing
