@@ -250,4 +250,4 @@ Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). To report 
 
 ## License
 
-[MIT](LICENSE) © Runtype Labs
+[MIT](LICENSE) © Runtype, Inc.

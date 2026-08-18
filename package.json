@@ -60,7 +60,7 @@
     "shopping",
     "cart"
   ],
-  "author": "Runtype Labs",
+  "author": "Runtype, Inc.",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/runtypelabs/runtype-bc-graphql-sdk/issues"
