@@ -48,7 +48,7 @@ src/
 - **Classify new tools.** When adding a tool, decide whether it belongs in `READ_ONLY_TOOL_NAMES` (see the README's "Read-only vs. mutating tools"). Only tools that cannot change cart/customer/order state are read-only; navigation-only tools count as read-only.
 - **Never expose credential flows to the model.** Tools that accept raw credentials must be added to `EXCLUDED_TOOL_NAMES` in `webmcp.ts` so they are not registered with WebMCP.
 - **Flatten connections.** Public methods should return plain arrays, not GraphQL connection/edge shapes.
-- **Match the existing style.** ESLint enforces most of it; run `npm run lint:fix`.
+- **Match the existing style.** oxlint enforces most of it; run `npm run lint:fix`.
 
 ## E2E tests
 

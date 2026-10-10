@@ -201,9 +201,9 @@ Raw GraphQL documents are also exported (`QUERIES`, `MUTATIONS`) if you need to 
 
 ```bash
 npm install
-npm run build        # ESM + CJS + browser IIFE bundles (tsup)
+npm run build        # ESM + CJS + browser IIFE bundles (tsdown)
 npm run typecheck    # tsc --noEmit
-npm run lint         # ESLint
+npm run lint         # oxlint
 npm test             # unit tests (Vitest)
 ```
 
