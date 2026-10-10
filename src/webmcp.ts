@@ -7,7 +7,7 @@
  * provide `document.modelContext` when the browser has no native implementation.
  */
 
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill'
+import { installWebMCP } from '@mcp-b/webmcp-polyfill'
 import type { BigCommerceAgentSDK } from './sdk'
 import {
   getAllToolDefinitions,
@@ -25,10 +25,11 @@ interface WebMCPToolDescriptor {
   description: string
   inputSchema?: unknown
   annotations?: { readOnlyHint?: boolean }
-  execute: (args: Record<string, unknown>) => unknown
+  execute: (args: Record<string, unknown>, options?: { signal?: AbortSignal }) => unknown
 }
 interface RegisterableModelContext {
-  registerTool(tool: WebMCPToolDescriptor): void
+  // Polyfill v6 (and the spec) return a Promise; older implementations return void.
+  registerTool(tool: WebMCPToolDescriptor): void | Promise<void>
 }
 
 type ToolImplementations = Record<string, (args: Record<string, unknown>) => Promise<unknown>>
@@ -71,7 +72,9 @@ export function registerWebMCPTools(sdk: BigCommerceAgentSDK): void {
   // Provide document.modelContext when the browser has no native WebMCP. No-op
   // if a native implementation or another polyfill instance already installed it
   // (e.g. the chat widget's own copy) - first installer wins, the rest no-op.
-  initializeWebMCPPolyfill()
+  // v6 also installs nothing on insecure (non-HTTPS, non-localhost) pages or
+  // pre-WebMCP-baseline browsers; the registerTool guard below covers that.
+  installWebMCP()
 
   const modelContext = (document as unknown as { modelContext?: RegisterableModelContext })
     .modelContext
@@ -102,7 +105,7 @@ export function registerWebMCPTools(sdk: BigCommerceAgentSDK): void {
 
     const toolName = def.name
     try {
-      modelContext.registerTool({
+      const registration = modelContext.registerTool({
         name: toolName,
         description: def.description,
         inputSchema: def.parametersSchema,
@@ -117,6 +120,8 @@ export function registerWebMCPTools(sdk: BigCommerceAgentSDK): void {
           return fn(args || {})
         },
       })
+      // Async rejections (e.g. a duplicate name) must not surface as unhandled.
+      if (registration instanceof Promise) registration.catch(() => {})
     } catch {
       // Never let one tool's registration failure break the rest of the SDK.
     }
