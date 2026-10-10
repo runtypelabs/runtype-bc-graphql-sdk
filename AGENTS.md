@@ -12,7 +12,7 @@ BigCommerce Storefront Agent SDK - a TypeScript library for AI agents to interac
 npm install          # Install dependencies
 npm run build        # Build all bundles (ESM, CJS, browser IIFE)
 npm run typecheck    # Run TypeScript type checking
-npm run lint         # Run ESLint
+npm run lint         # Run oxlint
 npm run lint:fix     # Auto-fix lint issues
 npm run codegen      # Regenerate src/generated/graphql.ts from schema.graphql + documents
 npm run update-schema # Re-fetch schema.graphql from BigCommerce, then run codegen
